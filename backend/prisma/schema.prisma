@@ -1,0 +1,222 @@
+// NBS SAPAC Chronicle — Prisma schema
+// Mirrors §3 of PLAN.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  member
+  admin
+}
+
+enum UserStatus {
+  pending
+  approved
+  disabled
+}
+
+enum QuarterStatus {
+  live
+  archived
+}
+
+enum EntryType {
+  post
+  upcoming_event
+}
+
+enum Tag {
+  team_event       @map("Team event")
+  learning         @map("Learning")
+  team_win         @map("Team win")
+  external         @map("External")
+  life_outside     @map("Life outside work")
+  vibe             @map("Just a vibe")
+}
+
+enum ReactionType {
+  like
+  going
+  interested
+}
+
+// Top-level action verbs for the activity log.
+enum ActivityAction {
+  user_login
+  user_signup
+  user_approved
+  user_rejected
+  user_role_changed
+  user_disabled
+  user_profile_updated
+
+  entry_created
+  entry_edited
+  entry_deleted
+  entry_auto_converted
+
+  comment_added
+  comment_deleted
+
+  reaction_added
+  reaction_removed
+
+  quarter_created
+  quarter_archived
+}
+
+// ─────────────────────────────────────────────────────────────
+//  MODELS
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id              String      @id @default(cuid())
+  googleId        String      @unique
+  email           String      @unique
+  name            String
+  firstName       String
+  avatarInitials  String      // eg "AC"
+  avatarColor     String      @default("#4285F4")
+  office          String?     // "IN" | "SG" — null until user fills profile
+  team            String?     // null until user fills profile
+  role            Role        @default(member)
+  status          UserStatus  @default(pending)
+
+  createdAt       DateTime    @default(now())
+  lastActiveAt    DateTime?
+
+  // Relations
+  entriesAuthored   Entry[]       @relation("EntryAuthor")
+  entriesContributed Entry[]      @relation("EntryContributors")
+  reactions         Reaction[]
+  comments          Comment[]
+  activityLog       ActivityLog[]
+
+  @@index([status])
+  @@index([role])
+}
+
+model Quarter {
+  id        String        @id              // eg "q2-2026"
+  label     String                          // eg "Q2 '26"
+  startDate DateTime
+  endDate   DateTime
+  status    QuarterStatus @default(live)
+
+  entries   Entry[]
+
+  @@index([status])
+}
+
+model Entry {
+  id              String     @id @default(cuid())
+  quarterId       String
+  authorId        String
+  type            EntryType  @default(post)
+
+  // Common
+  title           String
+  caption         String     @default("")
+  tag             Tag        @default(team_event)
+  heroPhotoId     String?    @unique   // FK to Photo (one-to-one for the hero)
+
+  // Post-specific (after-event)
+  eventName       String?              // eg "DFO Network"
+  eventDate       DateTime?            // when the event happened (for posts) OR is scheduled (for upcoming_event)
+
+  // Upcoming-event specific
+  venue           String?
+  venueMapUrl     String?              // Google Maps link
+  publicSlug      String?    @unique   // populated for upcoming_event — used by /event/:slug
+
+  // Denormalised counts (kept in sync via app code)
+  likeCount       Int        @default(0)
+  commentCount    Int        @default(0)
+  goingCount      Int        @default(0)
+  interestedCount Int        @default(0)
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  quarter         Quarter    @relation(fields: [quarterId], references: [id])
+  author          User       @relation("EntryAuthor", fields: [authorId], references: [id])
+  contributors    User[]     @relation("EntryContributors")
+  photos          Photo[]    @relation("EntryPhotos")
+  heroPhoto       Photo?     @relation("EntryHero", fields: [heroPhotoId], references: [id])
+  reactions       Reaction[]
+  comments        Comment[]
+
+  @@index([quarterId, type, createdAt])
+  @@index([authorId])
+  @@index([type, eventDate])
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  entryId   String
+  url       String
+  thumbUrl  String?
+  label     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  entry        Entry  @relation("EntryPhotos", fields: [entryId], references: [id], onDelete: Cascade)
+  entryAsHero  Entry? @relation("EntryHero")
+
+  @@index([entryId, order])
+}
+
+model Reaction {
+  entryId   String
+  userId    String
+  type      ReactionType
+  createdAt DateTime    @default(now())
+
+  entry     Entry       @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@id([entryId, userId, type])
+  @@index([entryId, type])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  entryId   String
+  userId    String
+  body      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  entry     Entry     @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([entryId, createdAt])
+}
+
+model ActivityLog {
+  id         String         @id @default(cuid())
+  actorId    String?
+  action     ActivityAction
+  targetType String?         // eg "Entry", "User"
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  actor      User?          @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([targetType, targetId])
+}

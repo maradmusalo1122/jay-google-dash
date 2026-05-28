@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SAPAC Gallery — NBS SAPAC People Pillar</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --bg:#F7F8FA;--bg2:#FFFFFF;--bg3:#F0F2F5;
+    --text:#1A1A2E;--text2:#64748B;--text3:#94A3B8;
+    --border:#E2E8F0;--border2:#CBD5E1;
+    --radius:8px;--radius-lg:12px;--radius-xl:16px;
+    --blue:#4285F4;--red:#EA4335;--yellow:#FBBC05;--green:#34A853;
+    --blue-light:#E8F0FE;--blue-dark:#185FA5;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);min-height:100vh;color:var(--text);}
+
+  /* ── LOGIN ── */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;background:var(--bg);}
+  .login-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-xl);padding:2.5rem 2rem;width:100%;max-width:340px;text-align:center;}
+  .login-logo{display:flex;flex-direction:column;align-items:center;margin-bottom:1.5rem;}
+  .login-logo svg{margin-bottom:12px;}
+  .login-logo h1{font-size:20px;font-weight:600;color:var(--text);}
+  .login-logo p{font-size:12px;color:var(--text2);margin-top:3px;}
+  .login-box h2{font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px;}
+  .login-box .sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem;line-height:1.6;}
+  .g-btn{width:100%;padding:11px 16px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg2);font-size:14px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .15s;}
+  .g-btn:hover{background:var(--bg3);}
+  .g-word span{font-weight:700;font-size:16px;}
+  .login-note{font-size:11px;color:var(--text3);margin-top:12px;}
+
+  /* ── APP SHELL ── */
+  #app{display:none;min-height:100vh;flex-direction:column;}
+
+  /* ── TOPBAR ── */
+  .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;}
+  .tlogo{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:600;color:var(--text);text-decoration:none;}
+  .qrow{display:flex;gap:6px;flex-wrap:wrap;}
+  .qpill{font-size:12px;padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;color:var(--text2);white-space:nowrap;transition:all .15s;}
+  .qpill:hover{border-color:var(--blue);color:var(--blue);}
+  .qpill.active{background:var(--blue-light);color:var(--blue-dark);border-color:#85B7EB;font-weight:500;}
+  .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:5px;vertical-align:middle;}
+  .user-row{display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .uav{width:32px;height:32px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--blue);}
+  .uname{font-size:13px;color:var(--text2);}
+  .signout{font-size:11px;color:var(--text3);text-decoration:underline;cursor:pointer;}
+
+  /* ── NAV ── */
+  .navrow{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;padding:0 20px;gap:0;overflow-x:auto;}
+  .ntab{font-size:13px;padding:12px 16px;border:none;background:transparent;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
+  .ntab:hover{color:var(--text);}
+  .ntab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:500;}
+
+  /* ── CONTENT ── */
+  .content{padding:20px;max-width:680px;margin:0 auto;width:100%;}
+  .sec{display:none;}
+  .sec.on{display:block;}
+
+  /* ── STATS ── */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;}
+  .stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;text-align:center;}
+  .stat-n{font-size:24px;font-weight:600;color:var(--text);}
+  .stat-l{font-size:12px;color:var(--text2);margin-top:2px;}
+
+  /* ── WEEK CARD ── */
+  .wcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-xl);margin-bottom:16px;overflow:hidden;}
+  .wcard-top{height:4px;display:flex;}
+  .wcard-top span{flex:1;}
+  .whead{padding:12px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .wtitle{font-size:15px;font-weight:600;color:var(--text);}
+  .wmeta{font-size:12px;color:var(--text2);margin-top:2px;}
+  .wtag{font-size:11px;padding:4px 10px;border-radius:99px;font-weight:500;white-space:nowrap;flex-shrink:0;}
+  .wall{display:grid;gap:2px;padding:2px;}
+  .wall.l1{grid-template-columns:1fr;}
+  .wall.l2{grid-template-columns:1fr 1fr;}
+  .wall.l3{grid-template-columns:2fr 1fr;grid-template-rows:120px 120px;}
+  .wall.l4{grid-template-columns:1fr 1fr;grid-template-rows:120px 120px;}
+  .wall.l5{grid-template-columns:2fr 1fr 1fr;grid-template-rows:120px 120px;}
+  .pcell{border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:pointer;transition:opacity .15s;}
+  .pcell:hover{opacity:0.9;}
+  .pcell.span2{grid-row:span 2;}
+  .pcell .pe{font-size:28px;}
+  .pcell .pl{font-size:11px;color:rgba(255,255,255,0.9);font-weight:500;text-align:center;padding:0 8px;margin-top:4px;}
+  .more-b{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);color:#fff;font-size:11px;padding:3px 8px;border-radius:99px;}
+  .wcap{padding:12px 16px 10px;font-size:14px;color:var(--text);line-height:1.6;}
+  .wreact{padding:4px 16px 8px;font-size:13px;color:var(--text2);}
+  .wact{padding:8px 16px 10px;display:flex;align-items:center;gap:16px;border-top:1px solid var(--border);}
+  .abtn{font-size:13px;color:var(--text2);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:var(--radius);transition:all .15s;}
+  .abtn:hover{background:var(--bg3);}
+  .abtn.liked{color:var(--red);}
+  .cavs{display:flex;align-items:center;margin-left:auto;}
+  .cav{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;border:2px solid var(--bg2);margin-left:-6px;}
+  .cav:first-child{margin-left:0;}
+  .cavlbl{font-size:12px;color:var(--text2);margin-left:8px;}
+  .comment-row{padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;}
+  .cinput{flex:1;font-size:13px;padding:7px 12px;border-radius:99px;border:1px solid var(--border);background:var(--bg3);color:var(--text);outline:none;}
+  .cinput:focus{border-color:var(--blue);}
+  .csend{font-size:12px;padding:7px 14px;border-radius:99px;border:none;background:var(--blue);color:#fff;cursor:pointer;font-weight:500;}
+  .csend:hover{background:var(--blue-dark);}
+
+  /* ── EXPLORE ── */
+  .srch{width:100%;font-size:14px;padding:10px 14px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--bg2);color:var(--text);outline:none;margin-bottom:12px;}
+  .srch:focus{border-color:var(--blue);}
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+  .pill{font-size:12px;padding:5px 12px;border-radius:99px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text2);transition:all .15s;}
+  .pill:hover{border-color:var(--blue);color:var(--blue);}
+  .pill.on{background:var(--blue-light);color:var(--blue-dark);border-color:#85B7EB;font-weight:500;}
+  .egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+  .ecard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;cursor:pointer;transition:border-color .15s;}
+  .ecard:hover{border-color:var(--blue);}
+  .ethumb{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:28px;}
+  .einfo{padding:8px 10px;}
+  .etitle{font-size:13px;font-weight:500;color:var(--text);}
+  .esub{font-size:11px;color:var(--text2);margin-top:2px;}
+
+  /* ── ARCHIVE ── */
+  .arch-intro{font-size:13px;color:var(--text2);margin-bottom:14px;}
+  .acard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-xl);margin-bottom:12px;overflow:hidden;cursor:pointer;}
+  .acard:hover{border-color:var(--blue-dark);}
+  .arow{padding:14px 18px;display:flex;align-items:center;gap:14px;}
+  .aicon{width:40px;height:40px;border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  .ainfo{flex:1;}
+  .aname{font-size:15px;font-weight:600;color:var(--text);}
+  .asub{font-size:12px;color:var(--text2);margin-top:2px;}
+  .achip{font-size:11px;padding:4px 10px;border-radius:99px;font-weight:500;}
+  .achev{font-size:16px;color:var(--text3);transition:transform .2s;}
+  .acard.open .achev{transform:rotate(90deg);}
+  .aexp{display:none;padding:12px 18px 16px;border-top:1px solid var(--border);}
+  .aexp.open{display:block;}
+  .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:12px;}
+  .mc{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+  .astats{display:flex;gap:8px;}
+  .as{flex:1;background:var(--bg3);border-radius:var(--radius);padding:8px;text-align:center;}
+  .as-n{font-size:18px;font-weight:600;color:var(--text);}
+  .as-l{font-size:11px;color:var(--text2);}
+
+  /* ── UPLOAD ── */
+  .upload-hero{background:#1A1A2E;border-radius:var(--radius-xl);padding:24px 20px 20px;margin-bottom:14px;}
+  .uh-title{font-size:20px;font-weight:600;color:#fff;text-align:center;margin-bottom:4px;}
+  .uh-sub{font-size:13px;color:rgba(255,255,255,0.45);text-align:center;margin-bottom:18px;}
+  .drop-wall{width:100%;min-height:170px;border:1.5px dashed rgba(255,255,255,0.2);border-radius:var(--radius-xl);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:20px;transition:border-color .2s;}
+  .drop-wall:hover{border-color:rgba(255,255,255,0.5);}
+  .drop-wall.filled{border-style:solid;border-color:rgba(255,255,255,0.12);padding:4px;}
+  .drop-empty{text-align:center;}
+  .drop-empty p{font-size:14px;color:rgba(255,255,255,0.6);margin-top:10px;}
+  .drop-empty small{font-size:12px;color:rgba(255,255,255,0.3);display:block;margin-top:4px;}
+  .ppgrid{display:grid;gap:3px;width:100%;border-radius:14px;overflow:hidden;}
+  .ppgrid.g1{grid-template-columns:1fr;}
+  .ppgrid.g2{grid-template-columns:1fr 1fr;}
+  .ppgrid.g3{grid-template-columns:2fr 1fr;grid-template-rows:100px 100px;}
+  .ppgrid.g4{grid-template-columns:1fr 1fr;grid-template-rows:100px 100px;}
+  .ppgrid.g5,.ppgrid.g6{grid-template-columns:1fr 1fr 1fr;grid-template-rows:100px 100px;}
+  .ppthumb{display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;cursor:pointer;min-height:100px;}
+  .ppthumb.big{grid-row:span 2;}
+  .ppremove{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;line-height:1;}
+  .add-more{background:rgba(255,255,255,0.08);border:1.5px dashed rgba(255,255,255,0.2);border-radius:var(--radius-lg);color:rgba(255,255,255,0.55);font-size:13px;padding:8px 18px;cursor:pointer;margin-top:12px;display:none;transition:background .15s;}
+  .add-more:hover{background:rgba(255,255,255,0.14);}
+
+  .upload-details{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-xl);padding:18px;margin-bottom:14px;}
+  .ud-head{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+  .ud-step{width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .ud-head span{font-size:14px;font-weight:500;color:var(--text);}
+  .fg{margin-bottom:14px;}
+  .fg label{font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:5px;}
+  .fg input,.fg select,.fg textarea{width:100%;font-size:14px;padding:9px 12px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--bg2);color:var(--text);outline:none;transition:border-color .15s;font-family:inherit;}
+  .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--blue);}
+  .fg textarea{resize:none;height:72px;line-height:1.5;}
+  .tag-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .tag-opt{padding:9px 6px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--bg2);font-size:12px;color:var(--text2);cursor:pointer;text-align:center;transition:all .15s;}
+  .tag-opt:hover{border-color:var(--blue);color:var(--blue);}
+  .tag-opt.sel{border-color:var(--blue);background:var(--blue-light);color:var(--blue-dark);font-weight:500;}
+
+  .preview-bar{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:14px;display:none;align-items:center;gap:12px;}
+  .pb-dot{width:10px;height:10px;border-radius:50%;background:var(--green);flex-shrink:0;}
+  .pb-info{flex:1;}
+  .pb-title{font-size:13px;font-weight:500;color:var(--text);}
+  .pb-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+
+  .post-btn{width:100%;padding:14px;border-radius:var(--radius-xl);border:none;background:var(--blue);color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .15s;}
+  .post-btn:hover{background:var(--blue-dark);}
+  .post-btn:disabled{background:var(--border2);color:var(--text3);cursor:not-allowed;}
+  .post-btn.success{background:var(--green);}
+
+  /* ── EMPTY STATE ── */
+  .empty{text-align:center;padding:3rem 1rem;color:var(--text2);}
+  .empty p{font-size:14px;margin-top:8px;}
+
+  /* ── TOAST ── */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A1A2E;color:#fff;font-size:13px;padding:10px 20px;border-radius:99px;display:none;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+  .toast.show{display:block;}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- LOGIN -->
+<div id="login-wrap" class="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="28" fill="none" stroke="#E8E8E8" stroke-width="1"/>
+        <path d="M32 4 A28 28 0 0 1 60 32" fill="none" stroke="#4285F4" stroke-width="7" stroke-linecap="round"/>
+        <path d="M60 32 A28 28 0 0 1 32 60" fill="none" stroke="#EA4335" stroke-width="7" stroke-linecap="round"/>
+        <path d="M32 60 A28 28 0 0 1 4 32" fill="none" stroke="#FBBC05" stroke-width="7" stroke-linecap="round"/>
+        <path d="M4 32 A28 28 0 0 1 32 4" fill="none" stroke="#34A853" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="32" cy="32" r="16" fill="none" stroke="#DDDDDD" stroke-width="0.75"/>
+        <circle cx="32" cy="32" r="9" fill="none" stroke="#4285F4" stroke-width="2"/>
+        <circle cx="32" cy="32" r="4" fill="#4285F4"/>
+        <circle cx="48" cy="10" r="3.5" fill="#EA4335"/>
+      </svg>
+      <h1>SAPAC Gallery</h1>
+      <p>NBS SAPAC · People Pillar</p>
+    </div>
+    <h2>Welcome back</h2>
+    <p class="sub">Sign in with your Google NBS account to access the team memory vault.</p>
+    <button class="g-btn" onclick="doLogin()">
+      <div class="g-word">
+        <span style="color:#4285F4;">G</span><span style="color:#EA4335;">o</span><span style="color:#FBBC05;">o</span><span style="color:#4285F4;">g</span><span style="color:#34A853;">l</span><span style="color:#EA4335;">e</span>
+      </div>
+      Continue with Google
+    </button>
+    <p class="login-note">@google.com accounts only · NBS SAPAC team</p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;flex-direction:column;">
+
+  <div class="topbar">
+    <div class="tlogo">
+      <svg width="30" height="30" viewBox="0 0 30 30">
+        <circle cx="15" cy="15" r="13" fill="none" stroke="#E8E8E8" stroke-width="0.75"/>
+        <path d="M15 2 A13 13 0 0 1 28 15" fill="none" stroke="#4285F4" stroke-width="4" stroke-linecap="round"/>
+        <path d="M28 15 A13 13 0 0 1 15 28" fill="none" stroke="#EA4335" stroke-width="4" stroke-linecap="round"/>
+        <path d="M15 28 A13 13 0 0 1 2 15" fill="none" stroke="#FBBC05" stroke-width="4" stroke-linecap="round"/>
+        <path d="M2 15 A13 13 0 0 1 15 2" fill="none" stroke="#34A853" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="15" cy="15" r="6" fill="none" stroke="#CCCCCC" stroke-width="0.75"/>
+        <circle cx="15" cy="15" r="3" fill="none" stroke="#4285F4" stroke-width="1.5"/>
+        <circle cx="15" cy="15" r="1.2" fill="#4285F4"/>
+        <circle cx="23" cy="5" r="2" fill="#EA4335"/>
+      </svg>
+      SAPAC Gallery
+    </div>
+    <div class="qrow">
+      <div class="qpill" onclick="switchQ('q3',this)">Q3 '24</div>
+      <div class="qpill" onclick="switchQ('q4',this)">Q4 '24</div>
+      <div class="qpill active" id="q1pill" onclick="switchQ('q1',this)">Q1 '25<span class="live-dot"></span></div>
+    </div>
+    <div class="user-row">
+      <div class="uav" id="uav">AC</div>
+      <span class="uname" id="uname-label">Abhishek</span>
+      <span class="signout" onclick="doLogout()">sign out</span>
+    </div>
+  </div>
+
+  <div class="navrow">
+    <button class="ntab active" onclick="switchTab('feed',this)">Weekly feed</button>
+    <button class="ntab" onclick="switchTab('explore',this)">Explore</button>
+    <button class="ntab" onclick="switchTab('archive',this)">Archive</button>
+    <button class="ntab" onclick="switchTab('upload',this)">+ Add week</button>
+  </div>
+
+  <div class="content">
+
+    <!-- FEED -->
+    <div id="sec-feed" class="sec on">
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="st-w">13</div><div class="stat-l">weeks</div></div>
+        <div class="stat"><div class="stat-n" id="st-p">84</div><div class="stat-l">photos</div></div>
+        <div class="stat"><div class="stat-n" id="st-c">32</div><div class="stat-l">contributors</div></div>
+      </div>
+      <div id="feed-container"></div>
+    </div>
+
+    <!-- EXPLORE -->
+    <div id="sec-explore" class="sec">
+      <input class="srch" type="text" placeholder="Search events, people, months..."/>
+      <div class="pills">
+        <div class="pill on" onclick="this.classList.toggle('on')">All</div>
+        <div class="pill" onclick="this.classList.toggle('on')">January</div>
+        <div class="pill" onclick="this.classList.toggle('on')">February</div>
+        <div class="pill" onclick="this.classList.toggle('on')">March</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Team events</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Learning</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Milestones</div>
+        <div class="pill" onclick="this.classList.toggle('on')">Fun</div>
+      </div>
+      <div class="egrid">
+        <div class="ecard"><div class="ethumb" style="background:#1D9E75;">🏖️</div><div class="einfo"><div class="etitle">SG Offsite</div><div class="esub">Mar · 6 photos</div></div></div>
+        <div class="ecard"><div class="ethumb" style="background:#EF9F27;">📚</div><div class="einfo"><div class="etitle">Learning week</div><div class="esub">Feb · 4 photos</div></div></div>
+        <div class="ecard"><div class="ethumb" style="background:#7F77DD;">🌱</div><div class="einfo"><div class="etitle">New joiners</div><div class="esub">Jan · 3 photos</div></div></div>
+        <div class="ecard"><div class="ethumb" style="background:#D4537E;">🎂</div><div class="einfo"><div class="etitle">Birthdays</div><div class="esub">Q1 · 5 photos</div></div></div>
+        <div class="ecard"><div class="ethumb" style="background:#378ADD;">☕</div><div class="einfo"><div class="etitle">Water cooler</div><div class="esub">Ongoing · 9</div></div></div>
+        <div class="ecard"><div class="ethumb" style="background:#34A853;">🏆</div><div class="einfo"><div class="etitle">Team wins</div><div class="esub">Q1 · 7 photos</div></div></div>
+      </div>
+    </div>
+
+    <!-- ARCHIVE -->
+    <div id="sec-archive" class="sec">
+      <p class="arch-intro">Every quarter sealed and saved. Tap any quarter to open the vault.</p>
+      <div class="acard" id="ac-q1" onclick="toggleArch('ae-q1','ac-q1')">
+        <div class="arow">
+          <div class="aicon" style="background:#E8F0FE;">🔓</div>
+          <div class="ainfo"><div class="aname">Q1 2025</div><div class="asub">Jan – Mar 2025 · Closes end of March</div></div>
+          <div class="achip" style="background:#E8F0FE;color:#185FA5;">Live</div>
+          <span class="achev">›</span>
+        </div>
+        <div class="aexp" id="ae-q1">
+          <div class="mini">
+            <div class="mc" style="background:#1D9E75;">🏖️</div>
+            <div class="mc" style="background:#EF9F27;">📚</div>
+            <div class="mc" style="background:#7F77DD;">🌱</div>
+            <div class="mc" style="background:#D4537E;">🎂</div>
+          </div>
+          <div class="astats">
+            <div class="as"><div class="as-n">13</div><div class="as-l">weeks</div></div>
+            <div class="as"><div class="as-n">84</div><div class="as-l">photos</div></div>
+            <div class="as"><div class="as-n">32</div><div class="as-l">contributors</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="acard" id="ac-q4" onclick="toggleArch('ae-q4','ac-q4')">
+        <div class="arow">
+          <div class="aicon" style="background:#FAEEDA;">📦</div>
+          <div class="ainfo"><div class="aname">Q4 2024</div><div class="asub">Oct – Dec 2024 · Sealed 31 Dec</div></div>
+          <div class="achip" style="background:#F1F5F9;color:#64748B;">Archived</div>
+          <span class="achev">›</span>
+        </div>
+        <div class="aexp" id="ae-q4">
+          <div class="mini">
+            <div class="mc" style="background:#EF9F27;">🎄</div>
+            <div class="mc" style="background:#7F77DD;">🎉</div>
+            <div class="mc" style="background:#378ADD;">🧠</div>
+            <div class="mc" style="background:#D4537E;">🎊</div>
+          </div>
+          <div class="astats">
+            <div class="as"><div class="as-n">13</div><div class="as-l">weeks</div></div>
+            <div class="as"><div class="as-n">61</div><div class="as-l">photos</div></div>
+            <div class="as"><div class="as-n">28</div><div class="as-l">contributors</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="acard" id="ac-q3" onclick="toggleArch('ae-q3','ac-q3')">
+        <div class="arow">
+          <div class="aicon" style="background:#E1F5EE;">📦</div>
+          <div class="ainfo"><div class="aname">Q3 2024</div><div class="asub">Jul – Sep 2024 · Sealed 30 Sep</div></div>
+          <div class="achip" style="background:#F1F5F9;color:#64748B;">Archived</div>
+          <span class="achev">›</span>
+        </div>
+        <div class="aexp" id="ae-q3">
+          <div class="mini">
+            <div class="mc" style="background:#1D9E75;">🌴</div>
+            <div class="mc" style="background:#D4537E;">🏃</div>
+            <div class="mc" style="background:#7F77DD;">🎤</div>
+            <div class="mc" style="background:#EF9F27;">🎨</div>
+          </div>
+          <div class="astats">
+            <div class="as"><div class="as-n">13</div><div class="as-l">weeks</div></div>
+            <div class="as"><div class="as-n">47</div><div class="as-l">photos</div></div>
+            <div class="as"><div class="as-n">21</div><div class="as-l">contributors</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD -->
+    <div id="sec-upload" class="sec">
+      <div class="upload-hero">
+        <div class="uh-title">What happened this week?</div>
+        <div class="uh-sub">Add your photos and tell the story — Q1 2025</div>
+        <div class="drop-wall" id="drop-wall" onclick="addPhoto()">
+          <div id="drop-empty" class="drop-empty">
+            <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+              <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+              <path d="M26 4 A22 22 0 0 1 48 26" fill="none" stroke="#4285F4" stroke-width="5" stroke-linecap="round"/>
+              <path d="M48 26 A22 22 0 0 1 26 48" fill="none" stroke="#EA4335" stroke-width="5" stroke-linecap="round"/>
+              <path d="M26 48 A22 22 0 0 1 4 26"  fill="none" stroke="#FBBC05" stroke-width="5" stroke-linecap="round"/>
+              <path d="M4 26 A22 22 0 0 1 26 4"   fill="none" stroke="#34A853" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="26" cy="26" r="9" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+              <circle cx="26" cy="26" r="4" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+              <circle cx="26" cy="26" r="1.5" fill="rgba(255,255,255,0.6)"/>
+              <line x1="26" y1="17" x2="26" y2="13" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <p>Tap to add photos</p>
+            <small>Add up to 10 — they tile automatically into a photo wall</small>
+          </div>
+          <div id="drop-filled" style="display:none;width:100%;">
+            <div class="ppgrid g1" id="ppgrid"></div>
+          </div>
+        </div>
+        <button class="add-more" id="add-more-btn" onclick="event.stopPropagation();addPhoto()">+ Add more photos</button>
+      </div>
+
+      <div class="upload-details">
+        <div class="ud-head"><div class="ud-step">2</div><span>Tell us about this week</span></div>
+        <div class="fg">
+          <label>Week of</label>
+          <input type="text" id="week-date" placeholder="e.g. 24 Mar 2025" oninput="updateBar()"/>
+        </div>
+        <div class="fg">
+          <label>What's the story?</label>
+          <textarea id="week-cap" placeholder="A few lines about what happened, who was there, what made it memorable..." oninput="updateBar()"></textarea>
+        </div>
+        <div class="fg">
+          <label style="margin-bottom:8px;">Tag this week</label>
+          <div class="tag-grid">
+            <div class="tag-opt sel" onclick="selTag(this)">Team event</div>
+            <div class="tag-opt" onclick="selTag(this)">Learning</div>
+            <div class="tag-opt" onclick="selTag(this)">People</div>
+            <div class="tag-opt" onclick="selTag(this)">Team win</div>
+            <div class="tag-opt" onclick="selTag(this)">Just a vibe</div>
+            <div class="tag-opt" onclick="selTag(this)">New joiners</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-bar" id="preview-bar">
+        <div class="pb-dot"></div>
+        <div class="pb-info">
+          <div class="pb-title" id="pb-title">Your week entry</div>
+          <div class="pb-sub" id="pb-sub">Ready to post to Q1 2025</div>
+        </div>
+      </div>
+
+      <button class="post-btn" id="post-btn" onclick="handlePost()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="7" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+          <path d="M9 2 A7 7 0 0 1 16 9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          <path d="M16 9 A7 7 0 0 1 9 16" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M9 16 A7 7 0 0 1 2 9"  fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M2 9 A7 7 0 0 1 9 2"   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Post this week to Q1 2025
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var photos=[];
+var likeState={};
+var pE=['🎉','📸','🌟','🎊','🏆','🎈','✨','💫','🎯','🎪'];
+var pC=['#1D9E75','#7F77DD','#EF9F27','#D4537E','#378ADD','#34A853','#EA4335','#4285F4','#FBBC05','#993556'];
+
+var feedData={
+  q1:[
+    {id:'w1',week:'Week of 17 Mar',event:'Singapore offsite',
+     photos:[{e:'🏖️',c:'#1D9E75',l:'Day 1 — Sentosa',span:true},{e:'🍜',c:'#0F6E56',l:'Lau Pa Sat dinner'},{e:'🎯',c:'#085041',l:'Strategy workshop'},{e:'🏆',c:'#5DCAA5',l:'Trivia night'},{e:'👥',c:'#9FE1CB',l:'Team photo',more:'+1'}],
+     layout:'l5',caption:'3 days, 32 people, 1 beach. Finance won trivia. We will not stop talking about it.',
+     tag:'Team event',tagbg:'#E1F5EE',tagtc:'#0A6B50',likes:18,comments:5,
+     contribs:[{i:'RK',bg:'#E8F0FE',tc:'#4285F4'},{i:'AM',bg:'#FEF3E2',tc:'#FBBC05'},{i:'SP',bg:'#FCE8E6',tc:'#EA4335'}]},
+    {id:'w2',week:'Week of 3 Feb',event:'Learning week',
+     photos:[{e:'📚',c:'#EF9F27',l:'Morning keynote'},{e:'💻',c:'#BA7517',l:'Python bootcamp'},{e:'🎤',c:'#FAC775',l:'Guest speaker'},{e:'🍕',c:'#854F0B',l:'Team lunch'}],
+     layout:'l4',caption:'Learning week done. Two camps formed over Python. Peace negotiations are ongoing.',
+     tag:'Learning',tagbg:'#FAEEDA',tagtc:'#854F0B',likes:24,comments:7,
+     contribs:[{i:'AM',bg:'#FEF3E2',tc:'#FBBC05'},{i:'VN',bg:'#E8F0FE',tc:'#4285F4'}]},
+    {id:'w3',week:'Week of 20 Jan',event:'New joiners month',
+     photos:[{e:'🌱',c:'#7F77DD',l:'Welcome lunch',span:true},{e:'🎉',c:'#534AB7',l:'Desk setup day 1'},{e:'☕',c:'#AFA9EC',l:'First team coffee'}],
+     layout:'l3',caption:'January brought 6 new faces. Q1 kicked off exactly right.',
+     tag:'People',tagbg:'#EEEDFE',tagtc:'#534AB7',likes:31,comments:9,
+     contribs:[{i:'AC',bg:'#E8F0FE',tc:'#4285F4'}]}
+  ],
+  q4:[
+    {id:'w4',week:'Week of 20 Dec',event:'Year-end party',
+     photos:[{e:'🎄',c:'#EA4335',l:'Ugly sweater contest',span:true},{e:'🎊',c:'#FBBC05',l:'Dance floor'},{e:'🥂',c:'#34A853',l:'Toast to 2024'}],
+     layout:'l3',caption:'Year-end 2024. Ugly sweaters, trivia, a dance-off nobody asked for but everyone needed.',
+     tag:'Team event',tagbg:'#FCE8E6',tagtc:'#C5221F',likes:41,comments:12,
+     contribs:[{i:'SP',bg:'#FCE8E6',tc:'#EA4335'},{i:'RK',bg:'#E8F0FE',tc:'#4285F4'}]}
+  ],
+  q3:[
+    {id:'w5',week:'Week of 12 Aug',event:'Team 5K run',
+     photos:[{e:'🏃',c:'#D4537E',l:'Race day morning',span:true},{e:'🏅',c:'#993556',l:'Finishers'},{e:'🥤',c:'#ED93B1',l:'Recovery chai'}],
+     layout:'l3',caption:'14 signed up. 9 ran. 5 spectated. All 14 claimed the finisher medal.',
+     tag:'Fun',tagbg:'#FBEAF0',tagtc:'#72243E',likes:52,comments:14,
+     contribs:[{i:'VN',bg:'#E8F0FE',tc:'#4285F4'},{i:'AM',bg:'#FEF3E2',tc:'#FBBC05'}]}
+  ]
+};
+
+var qStats={q1:{w:13,p:84,c:32},q4:{w:13,p:61,c:28},q3:{w:13,p:47,c:21}};
+
+function buildWall(ps,layout){
+  var h='<div class="wall '+layout+'">';
+  ps.forEach(function(p){
+    var cls='pcell'+(p.span?' span2':'');
+    h+='<div class="'+cls+'" style="background:'+p.c+';height:100%;">';
+    h+='<span class="pe">'+p.e+'</span><span class="pl">'+p.l+'</span>';
+    if(p.more)h+='<span class="more-b">'+p.more+'</span>';
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+
+function renderFeed(q){
+  var posts=feedData[q]||[];
+  var html='';
+  if(!posts.length){
+    html='<div class="empty"><div style="font-size:36px;">📭</div><p>No entries yet for this quarter.</p></div>';
+  }
+  posts.forEach(function(p){
+    var liked=likeState[p.id];
+    html+='<div class="wcard">';
+    html+='<div class="wcard-top"><span style="background:#4285F4;"></span><span style="background:#EA4335;"></span><span style="background:#FBBC05;"></span><span style="background:#34A853;"></span></div>';
+    html+='<div class="whead"><div><div class="wtitle">'+p.week+' — '+p.event+'</div><div class="wmeta">'+p.photos.length+' photos added</div></div>';
+    html+='<div class="wtag" style="background:'+p.tagbg+';color:'+p.tagtc+';">'+p.tag+'</div></div>';
+    html+=buildWall(p.photos,p.layout);
+    html+='<div class="wcap">'+p.caption+'</div>';
+    html+='<div class="wreact">❤️ '+p.likes+' &nbsp; 💬 '+p.comments+'</div>';
+    html+='<div class="wact">';
+    html+='<button class="abtn'+(liked?' liked':'')+'" onclick="toggleLike(\''+p.id+'\')" id="lb-'+p.id+'">'+(liked?'♥':'♡')+' <span id="lc-'+p.id+'">'+(liked?p.likes+1:p.likes)+'</span></button>';
+    html+='<button class="abtn">💬 Comment</button>';
+    html+='<div class="cavs">';
+    p.contribs.forEach(function(c){html+='<div class="cav" style="background:'+c.bg+';color:'+c.tc+';">'+c.i+'</div>';});
+    html+='<span class="cavlbl">contributed</span></div></div>';
+    html+='<div class="comment-row"><input class="cinput" placeholder="Add a comment..." onkeydown="handleComment(event,this)"/><button class="csend" onclick="postComment(this)">Post</button></div>';
+    html+='</div>';
+  });
+  document.getElementById('feed-container').innerHTML=html;
+  var s=qStats[q]||{w:0,p:0,c:0};
+  document.getElementById('st-w').textContent=s.w;
+  document.getElementById('st-p').textContent=s.p;
+  document.getElementById('st-c').textContent=s.c;
+}
+
+function toggleLike(id){
+  likeState[id]=!likeState[id];
+  var post=null;
+  Object.values(feedData).forEach(function(arr){arr.forEach(function(p){if(p.id===id)post=p;});});
+  if(!post)return;
+  var btn=document.getElementById('lb-'+id);
+  var cnt=document.getElementById('lc-'+id);
+  if(likeState[id]){btn.classList.add('liked');btn.childNodes[0].nodeValue='♥ ';cnt.textContent=post.likes+1;}
+  else{btn.classList.remove('liked');btn.childNodes[0].nodeValue='♡ ';cnt.textContent=post.likes;}
+}
+
+function handleComment(e,inp){if(e.key==='Enter')postComment(inp.nextElementSibling);}
+function postComment(btn){
+  var inp=btn.previousElementSibling;
+  if(!inp.value.trim())return;
+  showToast('Comment posted!');
+  inp.value='';
+}
+
+function switchQ(q,el){
+  document.querySelectorAll('.qpill').forEach(function(p){p.classList.remove('active');});
+  el.classList.add('active');
+  renderFeed(q);
+  var upTab=document.querySelectorAll('.ntab')[3];
+  if(q!=='q1'){upTab.style.opacity='0.4';upTab.title='Uploads only open for live quarter';}
+  else{upTab.style.opacity='1';upTab.title='';}
+}
+
+function switchTab(n,el){
+  document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('on');});
+  document.querySelectorAll('.ntab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('sec-'+n).classList.add('on');
+  el.classList.add('active');
+}
+
+function toggleArch(eid,cid){
+  var exp=document.getElementById(eid);
+  var card=document.getElementById(cid);
+  exp.classList.toggle('open');
+  card.classList.toggle('open');
+}
+
+function selTag(el){
+  document.querySelectorAll('.tag-opt').forEach(function(t){t.classList.remove('sel');});
+  el.classList.add('sel');
+  updateBar();
+}
+
+function updateBar(){
+  var date=document.getElementById('week-date').value;
+  var cap=document.getElementById('week-cap').value;
+  var tag=document.querySelector('.tag-opt.sel');
+  var bar=document.getElementById('preview-bar');
+  if(photos.length>0||date||cap){
+    bar.style.display='flex';
+    document.getElementById('pb-title').textContent=date?'Week of '+date:'Your week entry';
+    document.getElementById('pb-sub').textContent=(photos.length||0)+' photo'+(photos.length!==1?'s':'')+' · '+(tag?tag.textContent:'untagged')+' · Q1 2025';
+  } else {bar.style.display='none';}
+}
+
+function addPhoto(){
+  if(photos.length>=10)return;
+  photos.push({e:pE[photos.length%pE.length],c:pC[photos.length%pC.length]});
+  renderPPGrid();
+  document.getElementById('drop-empty').style.display='none';
+  document.getElementById('drop-filled').style.display='block';
+  document.getElementById('drop-wall').classList.add('filled');
+  document.getElementById('add-more-btn').style.display='inline-block';
+  updateBar();
+}
+
+function removePhoto(i){
+  photos.splice(i,1);
+  if(!photos.length){
+    document.getElementById('drop-empty').style.display='block';
+    document.getElementById('drop-filled').style.display='none';
+    document.getElementById('drop-wall').classList.remove('filled');
+    document.getElementById('add-more-btn').style.display='none';
+    document.getElementById('preview-bar').style.display='none';
+  } else renderPPGrid();
+  updateBar();
+}
+
+function renderPPGrid(){
+  var n=photos.length;
+  var cls=n>=5?'g5':n===4?'g4':n===3?'g3':n===2?'g2':'g1';
+  var g=document.getElementById('ppgrid');
+  g.className='ppgrid '+cls;
+  var h='';
+  photos.forEach(function(p,i){
+    var big=(n===3||n>=5)&&i===0?' big':'';
+    h+='<div class="ppthumb'+big+'" style="background:'+p.c+';" onclick="removePhoto('+i+')">';
+    h+='<span style="font-size:'+(big?'32':'24')+'px;">'+p.e+'</span>';
+    h+='<button class="ppremove" onclick="event.stopPropagation();removePhoto('+i+')">×</button>';
+    h+='</div>';
+  });
+  g.innerHTML=h;
+}
+
+function handlePost(){
+  var btn=document.getElementById('post-btn');
+  btn.classList.add('success');
+  btn.textContent='✓ Posted to Q1 2025!';
+  btn.disabled=true;
+  showToast('Week entry posted successfully!');
+  setTimeout(function(){
+    btn.classList.remove('success');
+    btn.innerHTML='<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1"/><path d="M9 2 A7 7 0 0 1 16 9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg> Post this week to Q1 2025';
+    btn.disabled=false;
+    photos=[];
+    document.getElementById('drop-empty').style.display='block';
+    document.getElementById('drop-filled').style.display='none';
+    document.getElementById('drop-wall').classList.remove('filled');
+    document.getElementById('add-more-btn').style.display='none';
+    document.getElementById('preview-bar').style.display='none';
+    document.getElementById('week-date').value='';
+    document.getElementById('week-cap').value='';
+  },2500);
+}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2500);
+}
+
+function doLogin(){
+  var names=['Abhishek Chopra','Priya Sharma','Rahul Khanna','Ananya Mehta'];
+  var name=names[Math.floor(Math.random()*names.length)];
+  var initials=name.split(' ').map(function(w){return w[0];}).join('');
+  document.getElementById('uav').textContent=initials;
+  document.getElementById('uname-label').textContent=name.split(' ')[0];
+  document.getElementById('login-wrap').style.display='none';
+  document.getElementById('app').style.display='flex';
+  renderFeed('q1');
+}
+
+function doLogout(){
+  document.getElementById('login-wrap').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-cream text-ink font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Headlines use DM Serif Display by default */
+  h1, h2, h3 {
+    @apply font-display;
+  }
+
+  /* Native form elements pick up our font */
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer components {
+  /* Subtle 4-colour Google stripe used on Post cards */
+  .google-stripe {
+    @apply flex h-[3px] w-full;
+  }
+  .google-stripe > span {
+    @apply flex-1;
+  }
+  .google-stripe > span:nth-child(1) { @apply bg-g-blue; }
+  .google-stripe > span:nth-child(2) { @apply bg-g-red; }
+  .google-stripe > span:nth-child(3) { @apply bg-g-yellow; }
+  .google-stripe > span:nth-child(4) { @apply bg-g-green; }
+}
