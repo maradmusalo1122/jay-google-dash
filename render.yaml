@@ -1,0 +1,48 @@
+# Render deployment config for the NBS SAPAC Chronicle backend.
+#
+# How to use:
+#   1. On render.com → New → Blueprint → connect this GitHub repo
+#   2. Render reads this file and proposes the service
+#   3. Fill the two sync:false env vars (DATABASE_URL, DIRECT_URL) from Neon
+#   4. Click Apply — first build takes ~3 minutes, then auto-deploys on every push to main
+#
+# After it's live, set APP_ORIGIN to your Vercel URL (also via the dashboard).
+
+services:
+  - type: web
+    name: sapac-chronicle-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Pasted from Neon → console.neon.tech → Connect button
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # Generated once by Render and kept stable across deploys
+      - key: JWT_SECRET
+        generateValue: true
+      # Comma-separated list of allowed origins. Update with your Vercel URL
+      # after first deploy. *.vercel.app preview deploys are also auto-allowed.
+      - key: APP_ORIGIN
+        value: https://jay-google-dash.vercel.app
+      # Keep dev signin available for testing until real Google OAuth is set up
+      - key: ALLOW_DEV_SIGNIN
+        value: "true"
+      # Fill in when you create the Google Cloud OAuth client
+      - key: GOOGLE_CLIENT_ID
+        value: ""
+      - key: GOOGLE_CLIENT_SECRET
+        value: ""
+      - key: GOOGLE_REDIRECT_URI
+        value: ""
+      - key: GOOGLE_HOSTED_DOMAIN
+        value: google.com

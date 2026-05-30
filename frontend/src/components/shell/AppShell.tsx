@@ -5,11 +5,18 @@ import NavRow from './NavRow'
 
 /**
  * Layout for authenticated routes: Topbar + NavRow + scrollable content.
- * If unauthenticated, bounces to /login. If pending, bounces to /pending.
+ * Waits for the async session check to settle before deciding to bounce.
  */
 export default function AppShell() {
-  const { currentUser } = useAuth()
+  const { currentUser, loading } = useAuth()
 
+  if (loading) {
+    return (
+      <div className="min-h-full flex items-center justify-center text-ink-3 text-sm">
+        Loading…
+      </div>
+    )
+  }
   if (!currentUser) return <Navigate to="/login" replace />
   if (currentUser.status === 'pending') return <Navigate to="/pending" replace />
 

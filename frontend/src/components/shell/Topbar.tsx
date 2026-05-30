@@ -11,8 +11,8 @@ export default function Topbar() {
   const { quarters, selectedQuarterId, setSelectedQuarter } = useStore()
   const navigate = useNavigate()
 
-  const handleSignOut = () => {
-    signOut()
+  const handleSignOut = async () => {
+    await signOut()
     navigate('/login')
   }
 

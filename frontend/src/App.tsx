@@ -21,10 +21,10 @@ import ApproveRegistrationPage from './pages/admin/ApproveRegistrationPage'
 
 export default function App() {
   return (
-    // Store wraps Auth so AuthProvider can derive currentUser from store.users
-    // (means profile edits update the topbar / comments / notifications live).
-    <StoreProvider>
-      <AuthProvider>
+    // Auth wraps Store: Store fetches everything on sign-in, so it depends
+    // on knowing who's signed in.
+    <AuthProvider>
+      <StoreProvider>
         <Routes>
           {/* Public — no shell, no auth */}
           <Route path="/" element={<Navigate to="/feed" replace />} />
@@ -52,7 +52,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-      </AuthProvider>
-    </StoreProvider>
+      </StoreProvider>
+    </AuthProvider>
   )
 }

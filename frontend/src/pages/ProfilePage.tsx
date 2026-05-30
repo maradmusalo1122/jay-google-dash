@@ -76,8 +76,8 @@ export default function ProfilePage() {
         target={target}
         isSelf={isSelf}
         onEdit={() => setEditOpen(true)}
-        onSignOut={() => {
-          signOut()
+        onSignOut={async () => {
+          await signOut()
           navigate('/login')
         }}
         onCopyEmail={() => {

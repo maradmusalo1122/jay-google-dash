@@ -1,47 +1,68 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
-import { useStore } from './store'
-import { KEYS, loadJSON, removeKey, saveJSON } from './persist'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react'
+import { api, ApiError } from './api'
 import type { User } from '@/types'
 
 interface AuthState {
   currentUser: User | null
-  signIn: (asUserId?: string) => void
-  signOut: () => void
+  loading: boolean
+  signIn: (asUserId?: string) => Promise<void>
+  signOut: () => Promise<void>
+  startGoogleOAuth: () => void
+  refresh: () => Promise<void>
 }
 
 const AuthCtx = createContext<AuthState | null>(null)
 
-const DEFAULT_USER_ID = 'u-abhishek' // admin — gives full access for testing
+const DEFAULT_USER_ID = 'u-abhishek' // admin — gives full access for testing (dev signin)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { users } = useStore()
-  // Hydrate from localStorage so refresh keeps you signed in.
-  const [currentUserId, setCurrentUserId] = useState<string | null>(() =>
-    loadJSON<string>(KEYS.auth),
-  )
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
 
-  // Live lookup so profile edits propagate immediately to header, comments, etc.
-  const currentUser = currentUserId ? users.find((u) => u.id === currentUserId) ?? null : null
+  const refresh = useCallback(async () => {
+    try {
+      const { user } = await api.get<{ user: User | null }>('/api/auth/me')
+      setCurrentUser(user)
+    } catch (e) {
+      if (!(e instanceof ApiError)) console.warn('[auth] /me failed', e)
+      setCurrentUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  function persist(id: string | null) {
-    if (id) saveJSON(KEYS.auth, id)
-    else removeKey(KEYS.auth)
-  }
+  // Initial session check
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
-  function signIn(asUserId: string = DEFAULT_USER_ID) {
-    const exists = users.some((u) => u.id === asUserId)
-    const id = exists ? asUserId : users[0]?.id ?? null
-    setCurrentUserId(id)
-    persist(id)
-  }
+  const signIn = useCallback(async (asUserId: string = DEFAULT_USER_ID) => {
+    const { user } = await api.post<{ user: User }>('/api/auth/dev-signin', { userId: asUserId })
+    setCurrentUser(user)
+  }, [])
 
-  function signOut() {
-    setCurrentUserId(null)
-    persist(null)
-  }
+  const signOut = useCallback(async () => {
+    try {
+      await api.post('/api/auth/signout')
+    } catch { /* still clear locally */ }
+    setCurrentUser(null)
+  }, [])
+
+  const startGoogleOAuth = useCallback(() => {
+    // Browser navigates away to Google → callback redirects back to /
+    const base = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+    window.location.href = `${base}/api/auth/google`
+  }, [])
 
   return (
-    <AuthCtx.Provider value={{ currentUser, signIn, signOut }}>
+    <AuthCtx.Provider value={{ currentUser, loading, signIn, signOut, startGoogleOAuth, refresh }}>
       {children}
     </AuthCtx.Provider>
   )

@@ -51,6 +51,11 @@ enum ReactionType {
   interested
 }
 
+enum NotificationKind {
+  mention_comment
+  mention_caption
+}
+
 // Top-level action verbs for the activity log.
 enum ActivityAction {
   user_login
@@ -88,6 +93,8 @@ model User {
   firstName       String
   avatarInitials  String      // eg "AC"
   avatarColor     String      @default("#4285F4")
+  avatarPhoto     String?     // Optional uploaded profile photo (URL or data URL)
+  coverPhoto      String?     // Optional uploaded cover photo
   office          String?     // "IN" | "SG" — null until user fills profile
   team            String?     // null until user fills profile
   role            Role        @default(member)
@@ -102,6 +109,8 @@ model User {
   reactions         Reaction[]
   comments          Comment[]
   activityLog       ActivityLog[]
+  notifications     Notification[] @relation("NotificationUser")
+  notificationsTriggered Notification[] @relation("NotificationActor")
 
   @@index([status])
   @@index([role])
@@ -204,6 +213,23 @@ model Comment {
   user      User      @relation(fields: [userId], references: [id])
 
   @@index([entryId, createdAt])
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String                            // recipient
+  type       NotificationKind
+  actorId    String                            // who triggered it
+  entryId    String?
+  commentId  String?
+  excerpt    String           @default("")
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  user       User             @relation("NotificationUser", fields: [userId], references: [id])
+  actor      User             @relation("NotificationActor", fields: [actorId], references: [id])
+
+  @@index([userId, read, createdAt])
 }
 
 model ActivityLog {
