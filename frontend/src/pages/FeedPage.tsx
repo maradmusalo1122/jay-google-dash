@@ -8,7 +8,7 @@ import Toast from '@/components/ui/Toast'
 import type { Entry } from '@/types'
 
 export default function FeedPage() {
-  const { entries, selectedQuarter, isViewingLive } = useStore()
+  const { entries, selectedQuarter, isViewingLive, loading } = useStore()
   const [openPhotoEntry, setOpenPhotoEntry] = useState<Entry | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -52,13 +52,21 @@ export default function FeedPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2.5 mb-5">
-        <StatCard number={totals.entries} label="Entries" />
-        <StatCard number={totals.photos} label="Photos" />
-        <StatCard number={totals.contributors} label="Contributors" />
-      </div>
+      {!loading && (
+        <div className="grid grid-cols-3 gap-2.5 mb-5">
+          <StatCard number={totals.entries} label="Entries" />
+          <StatCard number={totals.photos} label="Photos" />
+          <StatCard number={totals.contributors} label="Contributors" />
+        </div>
+      )}
 
-      {quarterEntries.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 text-ink-3">
+          <div className="inline-block w-8 h-8 border-2 border-ink-3 border-t-transparent rounded-full animate-spin" />
+          <p className="text-md mt-3">Loading the chronicle…</p>
+          <p className="text-sm text-ink-3 mt-1">The server may take ~30 seconds to wake up on first load.</p>
+        </div>
+      ) : quarterEntries.length === 0 ? (
         <div className="text-center py-16 text-ink-3">
           <div className="text-4xl">📭</div>
           <p className="text-md mt-2">No entries yet for {selectedQuarter.label}.</p>

@@ -82,14 +82,25 @@ interface StoreState {
 const StoreCtx = createContext<StoreState | null>(null)
 
 /** Re-fetch everything from the API after a sign-in/out. */
+/** Hit one endpoint with one retry — handles Render free-tier cold starts (~30s). */
+async function getWithRetry<T>(path: string): Promise<T> {
+  try {
+    return await api.get<T>(path)
+  } catch (err) {
+    // Wait a moment for the server to wake up, then try one more time
+    await new Promise((r) => setTimeout(r, 1500))
+    return await api.get<T>(path)
+  }
+}
+
 async function fetchAll() {
   const [u, q, e, c, r, n] = await Promise.all([
-    api.get<{ users: User[] }>('/api/users').catch(() => ({ users: [] as User[] })),
-    api.get<{ quarters: Quarter[] }>('/api/quarters').catch(() => ({ quarters: [] as Quarter[] })),
-    api.get<{ entries: Entry[] }>('/api/entries').catch(() => ({ entries: [] as Entry[] })),
-    api.get<{ comments: Comment[] }>('/api/comments').catch(() => ({ comments: [] as Comment[] })),
-    api.get<{ reactions: Reaction[] }>('/api/reactions').catch(() => ({ reactions: [] as Reaction[] })),
-    api.get<{ notifications: Notification[] }>('/api/notifications').catch(() => ({ notifications: [] as Notification[] })),
+    getWithRetry<{ users: User[] }>('/api/users').catch(() => ({ users: [] as User[] })),
+    getWithRetry<{ quarters: Quarter[] }>('/api/quarters').catch(() => ({ quarters: [] as Quarter[] })),
+    getWithRetry<{ entries: Entry[] }>('/api/entries').catch(() => ({ entries: [] as Entry[] })),
+    getWithRetry<{ comments: Comment[] }>('/api/comments').catch(() => ({ comments: [] as Comment[] })),
+    getWithRetry<{ reactions: Reaction[] }>('/api/reactions').catch(() => ({ reactions: [] as Reaction[] })),
+    getWithRetry<{ notifications: Notification[] }>('/api/notifications').catch(() => ({ notifications: [] as Notification[] })),
   ])
   return {
     users: u.users,

@@ -27,8 +27,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true)
 
   const refresh = useCallback(async () => {
+    // One retry to ride out Render free-tier cold starts (~30s wake)
+    const fetchMe = async () => api.get<{ user: User | null }>('/api/auth/me')
     try {
-      const { user } = await api.get<{ user: User | null }>('/api/auth/me')
+      let user: User | null
+      try {
+        ;({ user } = await fetchMe())
+      } catch (firstErr) {
+        // Only retry on network/server errors, not on 4xx auth errors
+        const status = firstErr instanceof ApiError ? firstErr.status : 0
+        if (status >= 400 && status < 500) throw firstErr
+        await new Promise((r) => setTimeout(r, 2000))
+        ;({ user } = await fetchMe())
+      }
       setCurrentUser(user)
     } catch (e) {
       if (!(e instanceof ApiError)) console.warn('[auth] /me failed', e)
