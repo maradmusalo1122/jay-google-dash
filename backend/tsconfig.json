@@ -17,9 +17,8 @@
     "noFallthroughCasesInSwitch": true,
     "declaration": false,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "noUnusedLocals": false
   },
