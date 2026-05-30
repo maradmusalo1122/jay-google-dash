@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // pooled connection — for the running app
+  directUrl = env("DIRECT_URL")     // direct connection — required by Neon for migrations
 }
 
 // ─────────────────────────────────────────────────────────────
