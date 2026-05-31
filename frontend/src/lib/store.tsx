@@ -82,15 +82,24 @@ interface StoreState {
 const StoreCtx = createContext<StoreState | null>(null)
 
 /** Re-fetch everything from the API after a sign-in/out. */
-/** Hit one endpoint with one retry — handles Render free-tier cold starts (~30s). */
+/** Hit one endpoint with exponential-backoff retries — survives Render free-tier cold starts (~30s). */
 async function getWithRetry<T>(path: string): Promise<T> {
-  try {
-    return await api.get<T>(path)
-  } catch (err) {
-    // Wait a moment for the server to wake up, then try one more time
-    await new Promise((r) => setTimeout(r, 1500))
-    return await api.get<T>(path)
+  const delays = [1000, 3000, 8000, 15000] // 4 retries spread over ~27s
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await api.get<T>(path)
+    } catch (err) {
+      lastErr = err
+      // Don't retry on auth/permission errors
+      const status = (err as any)?.status
+      if (status >= 400 && status < 500) throw err
+      if (attempt < delays.length) {
+        await new Promise((r) => setTimeout(r, delays[attempt]))
+      }
+    }
   }
+  throw lastErr
 }
 
 async function fetchAll() {

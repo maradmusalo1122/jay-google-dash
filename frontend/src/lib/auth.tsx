@@ -27,26 +27,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true)
 
   const refresh = useCallback(async () => {
-    // One retry to ride out Render free-tier cold starts (~30s wake)
-    const fetchMe = async () => api.get<{ user: User | null }>('/api/auth/me')
-    try {
-      let user: User | null
+    // Exponential-backoff retries to ride out Render free-tier cold starts (~30s wake)
+    const delays = [1000, 3000, 8000, 15000]
+    let lastErr: unknown
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
       try {
-        ;({ user } = await fetchMe())
-      } catch (firstErr) {
-        // Only retry on network/server errors, not on 4xx auth errors
-        const status = firstErr instanceof ApiError ? firstErr.status : 0
-        if (status >= 400 && status < 500) throw firstErr
-        await new Promise((r) => setTimeout(r, 2000))
-        ;({ user } = await fetchMe())
+        const { user } = await api.get<{ user: User | null }>('/api/auth/me')
+        setCurrentUser(user)
+        setLoading(false)
+        return
+      } catch (e) {
+        lastErr = e
+        // Don't retry on 4xx auth errors — those are real "not signed in"
+        if (e instanceof ApiError && e.status >= 400 && e.status < 500) break
+        if (attempt < delays.length) {
+          await new Promise((r) => setTimeout(r, delays[attempt]))
+        }
       }
-      setCurrentUser(user)
-    } catch (e) {
-      if (!(e instanceof ApiError)) console.warn('[auth] /me failed', e)
-      setCurrentUser(null)
-    } finally {
-      setLoading(false)
     }
+    if (!(lastErr instanceof ApiError)) console.warn('[auth] /me failed after retries', lastErr)
+    setCurrentUser(null)
+    setLoading(false)
   }, [])
 
   // Initial session check
