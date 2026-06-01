@@ -1,17 +1,18 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useStore } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import TagChip from '@/components/ui/TagChip'
 import ContributorAvatars from './ContributorAvatars'
 import CommentRow, { type CommentRowHandle } from './CommentRow'
 import MentionText from './MentionText'
+import PostMediaCarousel from './PostMediaCarousel'
 import { cn } from '@/lib/cn'
 import type { Entry } from '@/types'
 import { formatShortDate } from '@/lib/format'
 
 interface Props {
   entry: Entry
-  onOpenPhoto: (entry: Entry) => void
+  onOpenPhoto: (entry: Entry, index?: number) => void
 }
 
 export default function PostCard({ entry, onOpenPhoto }: Props) {
@@ -20,8 +21,17 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
   const commentRowRef = useRef<CommentRowHandle>(null)
 
   const liked = currentUser ? hasReaction(entry.id, currentUser.id, 'like') : false
-  const hero = entry.photos.find((p) => p.id === entry.heroPhotoId) ?? entry.photos[0]
-  const moreCount = entry.photos.length - 1
+
+  // Order photos with the hero first, then the rest by their stored order.
+  const orderedPhotos = useMemo(() => {
+    const list = [...entry.photos].sort((a, b) => a.order - b.order)
+    const heroIdx = list.findIndex((p) => p.id === entry.heroPhotoId)
+    if (heroIdx > 0) {
+      const [h] = list.splice(heroIdx, 1)
+      list.unshift(h)
+    }
+    return list
+  }, [entry.photos, entry.heroPhotoId])
 
   return (
     <article id={`entry-${entry.id}`} className="bg-surface border border-line rounded-lg overflow-hidden mb-4 scroll-mt-24">
@@ -42,45 +52,14 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
         <TagChip tag={entry.tag} />
       </div>
 
-      {/* Hero media (photo OR video) with optional +N overlay */}
-      {hero && hero.kind === 'video' ? (
-        <div className="relative bg-black">
-          <video
-            src={hero.url}
-            poster={hero.thumbUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="w-full max-h-[440px] bg-black"
-          />
-          {moreCount > 0 && (
-            <button
-              type="button"
-              onClick={() => onOpenPhoto(entry)}
-              className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-xs font-medium px-2.5 py-1 rounded-pill hover:bg-black/80"
-            >
-              +{moreCount} more
-            </button>
-          )}
-        </div>
-      ) : hero ? (
-        <button
-          type="button"
-          onClick={() => onOpenPhoto(entry)}
-          className="block w-full relative group"
-        >
-          <img
-            src={hero.url}
-            alt={hero.label ?? entry.title}
-            className="w-full max-h-[440px] object-cover group-hover:scale-[1.01] transition"
-          />
-          {moreCount > 0 && (
-            <span className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-xs font-medium px-2.5 py-1 rounded-pill">
-              +{moreCount} more
-            </span>
-          )}
-        </button>
-      ) : null}
+      {/* Inline media carousel — swipe, arrows, dots, counter */}
+      {orderedPhotos.length > 0 && (
+        <PostMediaCarousel
+          photos={orderedPhotos}
+          title={entry.title}
+          onOpenLightbox={(idx) => onOpenPhoto(entry, idx)}
+        />
+      )}
 
       {/* Caption */}
       <p className="px-4 pt-3 pb-2 text-base text-ink-2 leading-relaxed">

@@ -7,16 +7,17 @@ import { formatShortDate } from '@/lib/format'
 
 interface Props {
   entry: Entry | null
+  initialIndex?: number
   onClose: () => void
 }
 
-export default function PhotoModal({ entry, onClose }: Props) {
-  const [activeIdx, setActiveIdx] = useState(0)
+export default function PhotoModal({ entry, initialIndex = 0, onClose }: Props) {
+  const [activeIdx, setActiveIdx] = useState(initialIndex)
 
-  // Reset the active thumbnail every time we open a different entry.
+  // Jump to the clicked photo every time we open a different entry (or index).
   useEffect(() => {
-    setActiveIdx(0)
-  }, [entry?.id])
+    setActiveIdx(initialIndex)
+  }, [entry?.id, initialIndex])
 
   if (!entry) return null
   const photos = entry.photos

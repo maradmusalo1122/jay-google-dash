@@ -10,7 +10,13 @@ import type { Entry } from '@/types'
 export default function FeedPage() {
   const { entries, selectedQuarter, isViewingLive, loading } = useStore()
   const [openPhotoEntry, setOpenPhotoEntry] = useState<Entry | null>(null)
+  const [openPhotoIndex, setOpenPhotoIndex] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+
+  const openPhoto = (entry: Entry, index = 0) => {
+    setOpenPhotoEntry(entry)
+    setOpenPhotoIndex(index)
+  }
 
   const quarterEntries = useMemo(
     () =>
@@ -77,16 +83,16 @@ export default function FeedPage() {
             <UpcomingEventCard
               key={entry.id}
               entry={entry}
-              onOpenPhoto={setOpenPhotoEntry}
+              onOpenPhoto={(e) => openPhoto(e)}
               onShareLinkedIn={handleShareLinkedIn}
             />
           ) : (
-            <PostCard key={entry.id} entry={entry} onOpenPhoto={setOpenPhotoEntry} />
+            <PostCard key={entry.id} entry={entry} onOpenPhoto={openPhoto} />
           ),
         )
       )}
 
-      <PhotoModal entry={openPhotoEntry} onClose={() => setOpenPhotoEntry(null)} />
+      <PhotoModal entry={openPhotoEntry} initialIndex={openPhotoIndex} onClose={() => setOpenPhotoEntry(null)} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </div>
   )
