@@ -48,10 +48,16 @@ function pic(id: number | string, w = 1600, h = 900) {
     : `https://picsum.photos/seed/${encodeURIComponent(id)}/${w}/${h}`
 }
 
-/** Short, royalty-free sample clips hosted on Google's CDN — rock-solid URLs. */
+/**
+ * Short, royalty-free sample clip hosted by test-videos.co.uk (10s, 1MB).
+ * Used in the Surat Mixer post to showcase video rendering in the gallery.
+ * Picked because:
+ *   - Google's gtv-videos-bucket is now 403-locked
+ *   - test-videos.co.uk has been a reliable public sample host for years
+ *   - Tiny payload (1MB) → instant load
+ */
 const VIDEOS = {
-  joyrides: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-  blazes:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+  sampleClip: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
 }
 
 interface SeedPhoto { kind?: 'photo' | 'video'; url: string; thumbUrl?: string; label?: string; order: number }
@@ -129,9 +135,9 @@ const ENTRIES: Array<{
       ]),
       {
         kind: 'video', order: 2,
-        url: VIDEOS.joyrides,
+        url: VIDEOS.sampleClip,
         thumbUrl: un('1505373877841-8d25f7d46678', 480),
-        label: '15-second clip from the opening',
+        label: '10-second clip from the opening',
       },
       ...set([
         [un('1540575467063-178a50c2df87'), 'Q&A session'],
@@ -161,7 +167,7 @@ const ENTRIES: Array<{
     tag: 'life_outside', eventName: 'Team milestone', eventDate: new Date('2026-04-08T17:00:00Z'),
     photos: set([
       [un('1583939411023-14783179e581'), 'The mandap'],
-      [un('1606216794074-735e91aa5c9d'), 'The couple'],
+      [un('1591604466107-ec97de577aff'), 'The couple'],
       [un('1535025183041-0991a977e25b'), 'Floral arrangements'],
       [un('1519741497674-611481863552'), 'NBS table at the reception'],
     ]),
@@ -230,7 +236,7 @@ const ENTRIES: Array<{
     caption: 'Nikhil, Gunjeeta and teammates graduating from the Google Business Leadership Program at UC Berkeley. Certificates in hand, energy through the roof.',
     tag: 'learning', eventName: 'UC Berkeley', eventDate: new Date('2025-11-22T17:00:00Z'),
     photos: set([
-      [un('1523050854058-8df90110c9f1'), 'Berkeley campus'],
+      [un('1571260899304-425eee4c7efc'), 'Berkeley campus'],
       [un('1607237138185-eedd9c632b0b'), 'Graduation day — caps in air'],
       [un('1556761175-5973dc0f32e7'), 'NBS cohort'],
       [pic(219), 'Campus architecture'],
