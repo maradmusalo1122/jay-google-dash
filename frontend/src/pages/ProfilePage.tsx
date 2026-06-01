@@ -309,18 +309,30 @@ function ProfileStats({
   target: User
   entries: Entry[]
   comments: { userId: string }[]
-  reactions: { userId: string; type: string }[]
+  reactions: { entryId: string; userId: string; type: string }[]
 }) {
   const my = entries.filter((e) => e.authorId === target.id)
   const postsCount = my.filter((e) => e.type === 'post').length
-  const eventsCount = my.filter((e) => e.type === 'upcoming_event').length
   const photosCount = my.reduce((sum, e) => sum + e.photos.length, 0)
   const commentsCount = comments.filter((c) => c.userId === target.id).length
   const goingCount = reactions.filter((r) => r.userId === target.id && r.type === 'going').length
 
+  // "Contributed" — moments the user was part of but didn't author themselves:
+  // entries where they're listed as a contributor, OR events they RSVP'd "going" to.
+  // Authored entries are excluded (those are counted under Posts) so the two
+  // numbers don't double-count.
+  const goingEntryIds = new Set(
+    reactions.filter((r) => r.userId === target.id && r.type === 'going').map((r) => r.entryId),
+  )
+  const contributedCount = entries.filter(
+    (e) =>
+      e.authorId !== target.id &&
+      (e.contributorIds.includes(target.id) || goingEntryIds.has(e.id)),
+  ).length
+
   const stats: Array<{ n: number; label: string }> = [
     { n: postsCount, label: 'Posts' },
-    { n: eventsCount, label: 'Events' },
+    { n: contributedCount, label: 'Contributed' },
     { n: photosCount, label: 'Photos' },
     { n: goingCount, label: 'Going' },
     { n: commentsCount, label: 'Comments' },
