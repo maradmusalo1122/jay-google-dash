@@ -421,10 +421,14 @@ function PostsTab({ target, entries }: { target: User; entries: Entry[] }) {
                   </span>
                 )}
               </div>
-              <div className="text-xs text-ink-3">
-                {e.eventDate ? formatShortDate(e.eventDate) : formatShortDate(e.createdAt)} ·{' '}
-                {e.photos.length} {e.photos.length === 1 ? 'photo' : 'photos'} ·{' '}
-                ❤ {e.likeCount} · 💬 {e.commentCount}
+              <div className="text-xs text-ink-3 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span>{e.eventDate ? formatShortDate(e.eventDate) : formatShortDate(e.createdAt)}</span>
+                <span aria-hidden className="text-line-strong">·</span>
+                <span>{e.photos.length} {e.photos.length === 1 ? 'photo' : 'photos'}</span>
+                <span aria-hidden className="text-line-strong">·</span>
+                <span>❤️ {e.likeCount}</span>
+                <span aria-hidden className="text-line-strong">·</span>
+                <span>💬 {e.commentCount}</span>
               </div>
             </div>
           </Link>
