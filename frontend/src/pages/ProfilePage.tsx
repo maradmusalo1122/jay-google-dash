@@ -27,7 +27,15 @@ const AVATAR_COLORS = [
   '#EF9F27', '#534AB7', '#993556',
 ]
 
-type Tab = 'posts' | 'activity' | 'mentions' | 'about'
+type Tab =
+  | 'posts'
+  | 'contributed'
+  | 'photos'
+  | 'going'
+  | 'comments'
+  | 'activity'
+  | 'mentions'
+  | 'about'
 
 /**
  * Social-media-style profile page.
@@ -47,6 +55,37 @@ export default function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  const tid = target?.id ?? ''
+  const byNewest = (a: { createdAt: string }, b: { createdAt: string }) => b.createdAt.localeCompare(a.createdAt)
+
+  // Entries this user authored (Posts view + Photos source).
+  const authoredEntries = useMemo(
+    () => entries.filter((e) => e.authorId === tid).slice().sort(byNewest),
+    [entries, tid],
+  )
+  // Entries (events) this user RSVP'd "Going" to.
+  const goingEntryIds = useMemo(
+    () => new Set(reactions.filter((r) => r.userId === tid && r.type === 'going').map((r) => r.entryId)),
+    [reactions, tid],
+  )
+  // Things they were part of but didn't author: tagged contributor OR going.
+  const contributedEntries = useMemo(
+    () =>
+      entries
+        .filter((e) => e.authorId !== tid && (e.contributorIds.includes(tid) || goingEntryIds.has(e.id)))
+        .slice()
+        .sort(byNewest),
+    [entries, tid, goingEntryIds],
+  )
+  const goingEntries = useMemo(
+    () => entries.filter((e) => goingEntryIds.has(e.id)).slice().sort(byNewest),
+    [entries, goingEntryIds],
+  )
+  const myComments = useMemo(
+    () => comments.filter((c) => c.userId === tid).slice().sort(byNewest),
+    [comments, tid],
+  )
 
   useEffect(() => {
     setTab('posts')
@@ -91,10 +130,40 @@ export default function ProfilePage() {
       />
 
       <div className="px-4 sm:px-6">
-        <ProfileStats target={target} entries={entries} comments={comments} reactions={reactions} />
+        <ProfileStats
+          target={target}
+          entries={entries}
+          comments={comments}
+          reactions={reactions}
+          active={tab}
+          onSelect={setTab}
+        />
         <ProfileTabs tab={tab} setTab={setTab} />
         <div className="mt-4">
-          {tab === 'posts' && <PostsTab target={target} entries={entries} />}
+          {tab === 'posts' && (
+            <EntryGrid
+              entries={authoredEntries}
+              empty={{ emoji: '📭', title: `${target.firstName} hasn't posted yet`, body: "When they share moments, they'll show up here." }}
+            />
+          )}
+          {tab === 'contributed' && (
+            <EntryGrid
+              entries={contributedEntries}
+              empty={{ emoji: '🤝', title: `${target.firstName} hasn't been tagged in anything yet`, body: 'Posts and events they join or contribute to will appear here.' }}
+            />
+          )}
+          {tab === 'photos' && (
+            <PhotosGrid target={target} entries={authoredEntries} onOpenImage={setLightboxSrc} />
+          )}
+          {tab === 'going' && (
+            <EntryGrid
+              entries={goingEntries}
+              empty={{ emoji: '🗓️', title: `${target.firstName} isn't going to anything yet`, body: 'Events they RSVP "Going" to will show up here.' }}
+            />
+          )}
+          {tab === 'comments' && (
+            <CommentsList target={target} comments={myComments} entries={entries} />
+          )}
           {tab === 'activity' && (
             <ActivityTab target={target} entries={entries} comments={comments} reactions={reactions} />
           )}
@@ -305,14 +374,20 @@ function ProfileStats({
   entries,
   comments,
   reactions,
+  active,
+  onSelect,
 }: {
   target: User
   entries: Entry[]
   comments: { userId: string }[]
   reactions: { entryId: string; userId: string; type: string }[]
+  active: Tab
+  onSelect: (t: Tab) => void
 }) {
   const my = entries.filter((e) => e.authorId === target.id)
-  const postsCount = my.filter((e) => e.type === 'post').length
+  // Posts = everything they authored (posts + any events they created), so
+  // authored events aren't orphaned and the count matches the Posts view.
+  const postsCount = my.length
   const photosCount = my.reduce((sum, e) => sum + e.photos.length, 0)
   const commentsCount = comments.filter((c) => c.userId === target.id).length
   const goingCount = reactions.filter((r) => r.userId === target.id && r.type === 'going').length
@@ -330,25 +405,36 @@ function ProfileStats({
       (e.contributorIds.includes(target.id) || goingEntryIds.has(e.id)),
   ).length
 
-  const stats: Array<{ n: number; label: string }> = [
-    { n: postsCount, label: 'Posts' },
-    { n: contributedCount, label: 'Contributed' },
-    { n: photosCount, label: 'Photos' },
-    { n: goingCount, label: 'Going' },
-    { n: commentsCount, label: 'Comments' },
+  const stats: Array<{ n: number; label: string; view: Tab }> = [
+    { n: postsCount, label: 'Posts', view: 'posts' },
+    { n: contributedCount, label: 'Contributed', view: 'contributed' },
+    { n: photosCount, label: 'Photos', view: 'photos' },
+    { n: goingCount, label: 'Going', view: 'going' },
+    { n: commentsCount, label: 'Comments', view: 'comments' },
   ]
 
   return (
     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-5">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className="bg-surface border border-line rounded-md px-3 py-2.5 text-center hover:border-g-blue transition"
-        >
-          <div className="font-display text-2xl text-ink leading-none">{s.n}</div>
-          <div className="text-[10px] uppercase tracking-wider text-ink-3 mt-1 font-medium">{s.label}</div>
-        </div>
-      ))}
+      {stats.map((s) => {
+        const isActive = active === s.view
+        return (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => onSelect(s.view)}
+            aria-pressed={isActive}
+            className={cn(
+              'rounded-md px-3 py-2.5 text-center border transition outline-none focus-visible:ring-2 focus-visible:ring-g-blue/40',
+              isActive
+                ? 'bg-g-blue-l/40 border-g-blue'
+                : 'bg-surface border-line hover:border-g-blue hover:bg-surface-soft',
+            )}
+          >
+            <div className={cn('font-display text-2xl leading-none', isActive ? 'text-g-blue-d' : 'text-ink')}>{s.n}</div>
+            <div className={cn('text-[10px] uppercase tracking-wider mt-1 font-medium', isActive ? 'text-g-blue-d' : 'text-ink-3')}>{s.label}</div>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -357,8 +443,9 @@ function ProfileStats({
  *  TABS
  * ──────────────────────────────────────────────────────────── */
 function ProfileTabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  // Posts / Contributed / Photos / Going / Comments live in the clickable stat
+  // cards above; these are the remaining qualitative views.
   const tabs: Array<{ id: Tab; label: string }> = [
-    { id: 'posts', label: 'Posts' },
     { id: 'activity', label: 'Activity' },
     { id: 'mentions', label: 'Mentions' },
     { id: 'about', label: 'About' },
@@ -384,66 +471,174 @@ function ProfileTabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   )
 }
 
-function PostsTab({ target, entries }: { target: User; entries: Entry[] }) {
-  const mine = entries
-    .filter((e) => e.authorId === target.id)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+/** Jump to an entry in the feed. */
+function scrollToEntry(id: string) {
+  requestAnimationFrame(() => {
+    document.getElementById(`entry-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
 
-  if (mine.length === 0) {
-    return (
-      <EmptyState
-        emoji="📭"
-        title={`${target.firstName} hasn't posted yet`}
-        body="When they share moments, they'll show up here."
-      />
-    )
+/** One entry card — shared by the Posts / Contributed / Going grids. */
+function EntryCard({ e }: { e: Entry }) {
+  const hero = e.photos.find((p) => p.id === e.heroPhotoId) ?? e.photos[0]
+  const isUpcoming = e.type === 'upcoming_event'
+  const isVideo = hero?.kind === 'video'
+  return (
+    <Link
+      to="/feed"
+      onClick={() => scrollToEntry(e.id)}
+      className="bg-surface border border-line rounded-md overflow-hidden hover:border-g-blue transition group"
+    >
+      {hero && (
+        <div className="aspect-[16/9] overflow-hidden bg-surface-soft relative">
+          {isVideo && !hero.thumbUrl ? (
+            <video src={hero.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+          ) : (
+            <img
+              src={hero.thumbUrl ?? hero.url}
+              alt={e.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition"
+            />
+          )}
+          {isVideo && (
+            <span className="absolute inset-0 flex items-center justify-center text-white text-2xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">▶</span>
+          )}
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h3 className="font-display text-md text-ink leading-tight">{e.title}</h3>
+          {isUpcoming && (
+            <span className="text-[10px] font-semibold uppercase text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-pill flex-shrink-0">
+              Upcoming
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-ink-3 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span>{e.eventDate ? formatShortDate(e.eventDate) : formatShortDate(e.createdAt)}</span>
+          <span aria-hidden className="text-line-strong">·</span>
+          <span>{e.photos.length} {e.photos.length === 1 ? 'photo' : 'photos'}</span>
+          <span aria-hidden className="text-line-strong">·</span>
+          <span>❤️ {e.likeCount}</span>
+          <span aria-hidden className="text-line-strong">·</span>
+          <span>💬 {e.commentCount}</span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+/** Grid of entry cards with a contextual empty state. */
+function EntryGrid({
+  entries,
+  empty,
+}: {
+  entries: Entry[]
+  empty: { emoji: string; title: string; body: string }
+}) {
+  if (entries.length === 0) {
+    return <EmptyState emoji={empty.emoji} title={empty.title} body={empty.body} />
   }
-
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {mine.map((e) => {
-        const hero = e.photos.find((p) => p.id === e.heroPhotoId) ?? e.photos[0]
-        const isUpcoming = e.type === 'upcoming_event'
-        return (
+      {entries.map((e) => (
+        <EntryCard key={e.id} e={e} />
+      ))}
+    </div>
+  )
+}
+
+/** Photo gallery grid — every image across the user's authored entries. */
+function PhotosGrid({
+  target,
+  entries,
+  onOpenImage,
+}: {
+  target: User
+  entries: Entry[]
+  onOpenImage: (src: string) => void
+}) {
+  const media = entries.flatMap((e) => e.photos.map((p) => ({ p, e })))
+  if (media.length === 0) {
+    return <EmptyState emoji="🖼️" title={`No photos from ${target.firstName} yet`} body="Photos from their posts will appear here." />
+  }
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+      {media.map(({ p, e }) =>
+        p.kind === 'video' ? (
           <Link
-            key={e.id}
+            key={p.id}
             to="/feed"
-            onClick={() => {
-              requestAnimationFrame(() => {
-                document.getElementById(`entry-${e.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              })
-            }}
-            className="bg-surface border border-line rounded-md overflow-hidden hover:border-g-blue transition group"
+            onClick={() => scrollToEntry(e.id)}
+            className="relative aspect-square bg-black rounded-sm overflow-hidden group"
+            title={e.title}
           >
-            {hero && (
-              <div className="aspect-[16/9] overflow-hidden bg-surface-soft">
-                <img
-                  src={hero.thumbUrl ?? hero.url}
-                  alt={e.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition"
-                />
-              </div>
+            {p.thumbUrl ? (
+              <img src={p.thumbUrl} alt={p.label ?? e.title} className="w-full h-full object-cover" />
+            ) : (
+              <video src={p.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
             )}
-            <div className="p-3">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <h3 className="font-display text-md text-ink leading-tight">{e.title}</h3>
-                {isUpcoming && (
-                  <span className="text-[10px] font-semibold uppercase text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-pill flex-shrink-0">
-                    Upcoming
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-ink-3 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                <span>{e.eventDate ? formatShortDate(e.eventDate) : formatShortDate(e.createdAt)}</span>
-                <span aria-hidden className="text-line-strong">·</span>
-                <span>{e.photos.length} {e.photos.length === 1 ? 'photo' : 'photos'}</span>
-                <span aria-hidden className="text-line-strong">·</span>
-                <span>❤️ {e.likeCount}</span>
-                <span aria-hidden className="text-line-strong">·</span>
-                <span>💬 {e.commentCount}</span>
-              </div>
-            </div>
+            <span className="absolute inset-0 flex items-center justify-center text-white text-2xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">▶</span>
           </Link>
+        ) : (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onOpenImage(p.url)}
+            className="aspect-square bg-surface-soft rounded-sm overflow-hidden group cursor-zoom-in"
+            title={p.label ?? e.title}
+          >
+            <img
+              src={p.thumbUrl ?? p.url}
+              alt={p.label ?? e.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition"
+            />
+          </button>
+        ),
+      )}
+    </div>
+  )
+}
+
+/** List of the user's own comments, each linking back to its entry. */
+function CommentsList({
+  target,
+  comments,
+  entries,
+}: {
+  target: User
+  comments: { id: string; entryId: string; body: string; createdAt: string }[]
+  entries: Entry[]
+}) {
+  if (comments.length === 0) {
+    return <EmptyState emoji="💬" title={`${target.firstName} hasn't commented yet`} body="Their comments across the Chronicle will appear here." />
+  }
+  return (
+    <div className="bg-surface border border-line rounded-md divide-y divide-line">
+      {comments.map((c) => {
+        const entry = entries.find((e) => e.id === c.entryId)
+        return (
+          <div key={c.id} className="px-4 py-3">
+            <div className="text-base text-ink-2 leading-snug">
+              <MentionText body={c.body} />
+            </div>
+            <div className="text-xs text-ink-3 mt-1 flex flex-wrap items-center gap-x-1.5">
+              <span>on</span>
+              {entry ? (
+                <Link
+                  to="/feed"
+                  onClick={() => scrollToEntry(entry.id)}
+                  className="text-g-blue hover:underline"
+                >
+                  {entry.title}
+                </Link>
+              ) : (
+                <span className="italic">(deleted)</span>
+              )}
+              <span aria-hidden className="text-line-strong">·</span>
+              <span>{relativeTime(c.createdAt)}</span>
+            </div>
+          </div>
         )
       })}
     </div>
