@@ -11,6 +11,7 @@ import entryRoutes, { publicRouter as publicEventRoutes } from './routes/entries
 import commentRoutes from './routes/comments'
 import reactionRoutes from './routes/reactions'
 import notificationRoutes from './routes/notifications'
+import uploadRoutes from './routes/uploads'
 
 const app = express()
 const PORT = Number(process.env.PORT ?? 4000)
@@ -55,6 +56,7 @@ app.use('/api/entries', entryRoutes)
 app.use('/api/comments', commentRoutes)
 app.use('/api/reactions', reactionRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/uploads', uploadRoutes)
 
 // 404
 app.use('/api', (_req: Request, res: Response) => {

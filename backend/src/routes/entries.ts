@@ -62,10 +62,14 @@ const CreateEntryBody = z.object({
   photos: z
     .array(
       z.object({
+        kind: z.enum(['photo', 'video']).default('photo'),
         url: z.string().max(2_000_000),
         thumbUrl: z.string().max(2_000_000).optional(),
         label: z.string().max(120).optional(),
         order: z.number().int().nonnegative(),
+        duration: z.number().int().nonnegative().optional(),
+        width: z.number().int().positive().optional(),
+        height: z.number().int().positive().optional(),
       }),
     )
     .default([]),
@@ -103,7 +107,18 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       publicSlug: body.publicSlug,
       contributors: { connect: contribIds.map((id) => ({ id })) },
       photos: body.photos.length
-        ? { create: body.photos.map((p) => ({ url: p.url, thumbUrl: p.thumbUrl, label: p.label, order: p.order })) }
+        ? {
+            create: body.photos.map((p) => ({
+              kind: p.kind,
+              url: p.url,
+              thumbUrl: p.thumbUrl,
+              label: p.label,
+              order: p.order,
+              duration: p.duration,
+              width: p.width,
+              height: p.height,
+            })),
+          }
         : undefined,
     },
     include: entryInclude,

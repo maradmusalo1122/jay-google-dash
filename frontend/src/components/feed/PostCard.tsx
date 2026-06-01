@@ -42,8 +42,28 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
         <TagChip tag={entry.tag} />
       </div>
 
-      {/* Hero photo with optional +N overlay */}
-      {hero && (
+      {/* Hero media (photo OR video) with optional +N overlay */}
+      {hero && hero.kind === 'video' ? (
+        <div className="relative bg-black">
+          <video
+            src={hero.url}
+            poster={hero.thumbUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full max-h-[440px] bg-black"
+          />
+          {moreCount > 0 && (
+            <button
+              type="button"
+              onClick={() => onOpenPhoto(entry)}
+              className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-xs font-medium px-2.5 py-1 rounded-pill hover:bg-black/80"
+            >
+              +{moreCount} more
+            </button>
+          )}
+        </div>
+      ) : hero ? (
         <button
           type="button"
           onClick={() => onOpenPhoto(entry)}
@@ -60,7 +80,7 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
             </span>
           )}
         </button>
-      )}
+      ) : null}
 
       {/* Caption */}
       <p className="px-4 pt-3 pb-2 text-base text-ink-2 leading-relaxed">

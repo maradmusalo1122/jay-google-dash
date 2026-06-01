@@ -44,12 +44,18 @@ export interface Quarter {
   status: QuarterStatus
 }
 
+export type MediaKind = 'photo' | 'video'
+
 export interface Photo {
   id: string
-  url: string
-  thumbUrl?: string
+  kind?: MediaKind            // optional for backward-compat with legacy data
+  url: string                 // photo: image URL · video: video URL
+  thumbUrl?: string           // photo: thumbnail · video: poster frame
   label?: string
   order: number
+  duration?: number           // seconds, only for videos
+  width?: number
+  height?: number
 }
 
 export interface Comment {

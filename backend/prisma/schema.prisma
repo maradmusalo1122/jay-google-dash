@@ -56,6 +56,11 @@ enum NotificationKind {
   mention_caption
 }
 
+enum MediaKind {
+  photo
+  video
+}
+
 // Top-level action verbs for the activity log.
 enum ActivityAction {
   user_login
@@ -173,14 +178,19 @@ model Entry {
   @@index([type, eventDate])
 }
 
+// "Photo" name is kept for backward-compat — actually stores any media (photo or video).
 model Photo {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   entryId   String
-  url       String
-  thumbUrl  String?
+  kind      MediaKind  @default(photo)
+  url       String                                // photo: full image URL  · video: video URL
+  thumbUrl  String?                               // photo: thumbnail · video: poster/cover frame
   label     String?
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
+  order     Int        @default(0)
+  duration  Int?                                  // video duration in seconds (null for photos)
+  width     Int?
+  height    Int?
+  createdAt DateTime   @default(now())
 
   entry        Entry  @relation("EntryPhotos", fields: [entryId], references: [id], onDelete: Cascade)
   entryAsHero  Entry? @relation("EntryHero")

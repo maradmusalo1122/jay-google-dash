@@ -1,21 +1,31 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
 import { useStore } from '@/lib/store'
+import { uploadMedia, type UploadedMedia } from '@/lib/uploads'
 import { ALL_TAGS, type Tag } from '@/types'
 import Toast from '@/components/ui/Toast'
 import MentionInput from '@/components/feed/MentionInput'
+import PhotoCropModal from '@/components/ui/PhotoCropModal'
 import { cn } from '@/lib/cn'
 
 type Mode = 'post' | 'upcoming_event'
 
-const PLACEHOLDER_COLORS = ['#1D9E75', '#7F77DD', '#EF9F27', '#D4537E', '#378ADD', '#34A853', '#EA4335', '#4285F4', '#FBBC05', '#993556']
-
-interface PendingPhoto {
+/** A file the user picked, in one of three states. */
+interface MediaItem {
   id: string
-  seed: string
-  color: string
+  status: 'uploading' | 'ready' | 'error'
+  pct: number
+  kind: 'photo' | 'video'
+  /** Local preview URL (object URL or data URL) — for the thumbnail tile while uploading. */
+  preview: string
+  /** Server-returned data after upload completes. */
+  media?: UploadedMedia
+  error?: string
 }
+
+const MAX_PHOTOS_POST = 10
+const MAX_PHOTOS_EVENT = 1
 
 export default function AddEntryPage() {
   const { currentUser } = useAuth()
@@ -30,8 +40,15 @@ export default function AddEntryPage() {
   const [eventName, setEventName] = useState('')
   const [venue, setVenue] = useState('')
   const [venueMapUrl, setVenueMapUrl] = useState('')
-  const [photos, setPhotos] = useState<PendingPhoto[]>([])
+  const [items, setItems] = useState<MediaItem[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  // For the "Edit (crop)" flow on a single photo thumbnail
+  const [cropFor, setCropFor] = useState<{ id: string; source: string } | null>(null)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const maxCount = mode === 'post' ? MAX_PHOTOS_POST : MAX_PHOTOS_EVENT
 
   const resetForm = () => {
     setTitle('')
@@ -41,66 +58,148 @@ export default function AddEntryPage() {
     setEventName('')
     setVenue('')
     setVenueMapUrl('')
-    setPhotos([])
+    items.forEach((it) => {
+      if (it.preview.startsWith('blob:')) URL.revokeObjectURL(it.preview)
+    })
+    setItems([])
   }
 
-  const addPhoto = () => {
-    if (photos.length >= 10) return
-    const i = photos.length
-    setPhotos((p) => [
-      ...p,
-      {
-        id: `pp-${Date.now()}-${i}`,
-        seed: `user-${mode}-${Date.now()}-${i}`,
-        color: PLACEHOLDER_COLORS[i % PLACEHOLDER_COLORS.length],
-      },
-    ])
+  const handleFilesPicked = async (filesRaw: FileList | null) => {
+    if (!filesRaw || !filesRaw.length) return
+    const remaining = maxCount - items.length
+    const files = Array.from(filesRaw).slice(0, remaining)
+
+    // Create placeholder tiles first so the user sees instant feedback
+    const tiles: MediaItem[] = files.map((f) => ({
+      id: `mi-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      status: 'uploading',
+      pct: 0,
+      kind: f.type.startsWith('video/') ? 'video' : 'photo',
+      preview: URL.createObjectURL(f),
+    }))
+    setItems((prev) => [...prev, ...tiles])
+
+    // Upload each in parallel
+    await Promise.all(
+      tiles.map(async (tile, i) => {
+        try {
+          const uploaded = await uploadMedia(files[i], {
+            onProgress: (pct) =>
+              setItems((prev) => prev.map((x) => (x.id === tile.id ? { ...x, pct } : x))),
+          })
+          setItems((prev) =>
+            prev.map((x) => (x.id === tile.id ? { ...x, status: 'ready', media: uploaded, pct: 100 } : x)),
+          )
+        } catch (e: any) {
+          setItems((prev) =>
+            prev.map((x) =>
+              x.id === tile.id ? { ...x, status: 'error', error: e?.message || 'upload failed' } : x,
+            ),
+          )
+        }
+      }),
+    )
   }
 
-  const removePhoto = (id: string) => {
-    setPhotos((p) => p.filter((x) => x.id !== id))
+  const removeItem = (id: string) => {
+    setItems((prev) => {
+      const target = prev.find((p) => p.id === id)
+      if (target?.preview.startsWith('blob:')) URL.revokeObjectURL(target.preview)
+      return prev.filter((p) => p.id !== id)
+    })
   }
+
+  const openCropFor = (id: string) => {
+    const it = items.find((x) => x.id === id)
+    if (!it || it.kind !== 'photo' || it.status !== 'ready' || !it.media) return
+    // Use the full server URL as the cropper source
+    setCropFor({ id, source: it.media.url })
+  }
+
+  /** When the crop modal saves, re-upload the cropped image as a fresh file and swap it in. */
+  const handleCropSave = async (dataUrl: string) => {
+    if (!cropFor) return
+    const id = cropFor.id
+    setCropFor(null)
+    // Convert data URL → File so we can re-use uploadMedia
+    const blob = await (await fetch(dataUrl)).blob()
+    const file = new File([blob], 'cropped.jpg', { type: blob.type || 'image/jpeg' })
+    setItems((prev) =>
+      prev.map((x) =>
+        x.id === id ? { ...x, status: 'uploading', pct: 0, preview: URL.createObjectURL(blob) } : x,
+      ),
+    )
+    try {
+      const uploaded = await uploadMedia(file, {
+        onProgress: (pct) =>
+          setItems((prev) => prev.map((x) => (x.id === id ? { ...x, pct } : x))),
+      })
+      setItems((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, status: 'ready', media: uploaded, pct: 100 } : x)),
+      )
+    } catch (e: any) {
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === id ? { ...x, status: 'error', error: e?.message || 'upload failed' } : x,
+        ),
+      )
+    }
+  }
+
+  const readyItems = items.filter((i) => i.status === 'ready' && i.media)
+  const hasUploadInFlight = items.some((i) => i.status === 'uploading')
 
   const canSubmit =
+    !submitting &&
+    !hasUploadInFlight &&
     title.trim() &&
     caption.trim() &&
-    (mode === 'upcoming_event' ? eventDate && venue : true)
+    (mode === 'upcoming_event' ? eventDate && venue && readyItems.length >= 1 : true)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!currentUser || !canSubmit) return
+    setSubmitting(true)
+    try {
+      if (mode === 'post') {
+        await addPost({
+          authorId: currentUser.id,
+          title: title.trim(),
+          caption: caption.trim(),
+          tag,
+          eventName: eventName.trim() || undefined,
+          eventDate: eventDate ? new Date(eventDate).toISOString() : undefined,
+          media: readyItems.map((i) => i.media!),
+        })
+        setToast(`Posted to ${liveQuarter.label}!`)
+      } else {
+        const hero = readyItems[0]?.media
+        if (!hero) {
+          setToast('Please add a hero photo first.')
+          setSubmitting(false)
+          return
+        }
+        await addUpcomingEvent({
+          authorId: currentUser.id,
+          title: title.trim(),
+          caption: caption.trim(),
+          tag,
+          eventDate: new Date(eventDate).toISOString(),
+          venue: venue.trim(),
+          venueMapUrl: venueMapUrl.trim() || `https://maps.google.com/?q=${encodeURIComponent(venue)}`,
+          hero,
+        })
+        setToast('Upcoming event added to the Chronicle!')
+      }
 
-    if (mode === 'post') {
-      const seeds = photos.length > 0 ? photos.map((p) => p.seed) : [`user-post-${Date.now()}-0`]
-      addPost({
-        authorId: currentUser.id,
-        title: title.trim(),
-        caption: caption.trim(),
-        tag,
-        eventName: eventName.trim() || undefined,
-        eventDate: eventDate ? new Date(eventDate).toISOString() : undefined,
-        photoSeeds: seeds,
-      })
-      setToast(`Posted to ${liveQuarter.label}!`)
-    } else {
-      addUpcomingEvent({
-        authorId: currentUser.id,
-        title: title.trim(),
-        caption: caption.trim(),
-        tag,
-        eventDate: new Date(eventDate).toISOString(),
-        venue: venue.trim(),
-        venueMapUrl: venueMapUrl.trim() || `https://maps.google.com/?q=${encodeURIComponent(venue)}`,
-        photoSeed: photos[0]?.seed ?? `user-event-${Date.now()}`,
-      })
-      setToast('Upcoming event added to the Chronicle!')
+      resetForm()
+      setTimeout(() => navigate('/feed'), 900)
+    } catch (e: any) {
+      setToast(`Failed to post: ${e?.message || 'unknown error'}`)
+    } finally {
+      setSubmitting(false)
     }
-
-    resetForm()
-    setTimeout(() => navigate('/feed'), 900)
   }
 
-  // If user is viewing an archived quarter, they shouldn't be here.
-  // Switch them back to live and show a notice.
   if (!isViewingLive) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-md p-5">
@@ -119,6 +218,8 @@ export default function AddEntryPage() {
     )
   }
 
+  const acceptStr = mode === 'post' ? 'image/*,video/*' : 'image/*'
+
   return (
     <div>
       <h1 className="font-display text-2xl text-ink mb-4">+ Add entry</h1>
@@ -135,7 +236,7 @@ export default function AddEntryPage() {
           )}
         >
           <div className="font-display text-lg leading-tight">Post</div>
-          <div className="text-xs text-ink-3 mt-1">Share what already happened — photos, caption, contributors.</div>
+          <div className="text-xs text-ink-3 mt-1">Share what already happened — photos, videos, story.</div>
         </button>
         <button
           type="button"
@@ -152,59 +253,59 @@ export default function AddEntryPage() {
         </button>
       </div>
 
-      {/* Hero block (dark, like prototype) */}
+      {/* Hero block — media uploader */}
       <div className="bg-ink rounded-lg px-4 sm:px-5 py-5 mb-3">
         <div className="font-display text-xl text-white text-center mb-1">
           {mode === 'post' ? 'What happened?' : 'What are you organising?'}
         </div>
         <div className="text-xs text-white/40 text-center mb-4">
           {mode === 'post'
-            ? `Add photos and tell the story — ${liveQuarter.label}`
+            ? `Add photos or videos and tell the story — ${liveQuarter.label}`
             : `Add a hero photo and event details — ${liveQuarter.label}`}
         </div>
 
-        {photos.length === 0 ? (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={acceptStr}
+          multiple={mode === 'post'}
+          className="hidden"
+          onChange={(e) => {
+            handleFilesPicked(e.target.files)
+            e.target.value = ''
+          }}
+        />
+
+        {items.length === 0 ? (
           <button
             type="button"
-            onClick={addPhoto}
+            onClick={() => fileInputRef.current?.click()}
             className="w-full min-h-[140px] border-2 border-dashed border-white/20 rounded-md text-white/60 hover:border-white/40 transition flex flex-col items-center justify-center px-4 py-5"
           >
             <div className="text-3xl">📷</div>
-            <p className="text-md mt-2">Tap to add {mode === 'post' ? 'photos' : 'a hero photo'}</p>
+            <p className="text-md mt-2">
+              Tap to add {mode === 'post' ? 'photos or videos' : 'a hero photo'}
+            </p>
             <p className="text-xs text-white/40 mt-1">
-              {mode === 'post' ? 'Up to 10 photos' : '1 hero image'}
+              {mode === 'post' ? `Up to ${MAX_PHOTOS_POST} files · jpg/png/mp4/mov` : '1 hero image'}
             </p>
           </button>
         ) : (
           <>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 mb-3 rounded-md overflow-hidden">
-              {photos.map((p) => (
-                <div
-                  key={p.id}
-                  className="relative aspect-square flex items-center justify-center text-white/80 text-2xl"
-                  style={{ backgroundColor: p.color }}
-                >
-                  📷
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(p.id)}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/55 text-white text-xs flex items-center justify-center"
-                    aria-label="Remove photo"
-                  >
-                    ×
-                  </button>
-                </div>
+              {items.map((it) => (
+                <MediaTile key={it.id} item={it} onRemove={() => removeItem(it.id)} onEdit={() => openCropFor(it.id)} />
               ))}
             </div>
-            {(mode === 'post' && photos.length < 10) || (mode === 'upcoming_event' && photos.length < 1) ? (
+            {items.length < maxCount && (
               <button
                 type="button"
-                onClick={addPhoto}
+                onClick={() => fileInputRef.current?.click()}
                 className="w-full px-4 py-2 rounded-sm border-2 border-dashed border-white/20 text-white/60 text-base hover:border-white/40 transition"
               >
-                + Add more photos ({photos.length}/{mode === 'post' ? 10 : 1})
+                + Add more ({items.length}/{maxCount})
               </button>
-            ) : null}
+            )}
           </>
         )}
       </div>
@@ -300,10 +401,26 @@ export default function AddEntryPage() {
         disabled={!canSubmit}
         className="w-full py-3.5 rounded-md bg-g-blue text-white font-display text-md hover:bg-g-blue-d disabled:bg-line-strong disabled:text-ink-3 disabled:cursor-not-allowed transition"
       >
-        {mode === 'post' ? `Post to ${liveQuarter.label}` : `Add to ${liveQuarter.label}`}
+        {submitting
+          ? 'Posting…'
+          : hasUploadInFlight
+            ? 'Waiting for uploads…'
+            : mode === 'post'
+              ? `Post to ${liveQuarter.label}`
+              : `Add to ${liveQuarter.label}`}
       </button>
 
       <Toast message={toast} onDone={() => setToast(null)} />
+
+      <PhotoCropModal
+        open={!!cropFor}
+        image={cropFor?.source ?? null}
+        shape="rect"
+        aspect={4 / 3}
+        outputSize={1600}
+        onCancel={() => setCropFor(null)}
+        onSave={handleCropSave}
+      />
 
       <style>{`
         .form-input {
@@ -329,6 +446,77 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-xs font-medium text-ink-3 mb-1.5">{label}</label>
       {children}
+    </div>
+  )
+}
+
+/* ────────────────────────────────────────────────────────────────
+ *  MediaTile — one cell in the upload grid. Handles its 3 states:
+ *  uploading (progress bar), ready (image/video + edit/remove), error.
+ * ──────────────────────────────────────────────────────────────── */
+function MediaTile({
+  item,
+  onRemove,
+  onEdit,
+}: {
+  item: MediaItem
+  onRemove: () => void
+  onEdit: () => void
+}) {
+  return (
+    <div className="relative aspect-square bg-white/5 rounded-sm overflow-hidden group">
+      {item.kind === 'video' ? (
+        <video src={item.preview} className="w-full h-full object-cover" muted playsInline />
+      ) : (
+        // eslint-disable-next-line jsx-a11y/alt-text
+        <img src={item.preview} className="w-full h-full object-cover" />
+      )}
+
+      {/* Status overlay */}
+      {item.status === 'uploading' && (
+        <div className="absolute inset-0 bg-ink/60 flex flex-col items-center justify-center text-white text-xs">
+          <span>{item.pct}%</span>
+          <div className="w-3/4 h-1 bg-white/20 rounded-full mt-1.5 overflow-hidden">
+            <div className="h-full bg-g-blue transition-all" style={{ width: `${item.pct}%` }} />
+          </div>
+        </div>
+      )}
+
+      {item.status === 'error' && (
+        <div className="absolute inset-0 bg-rose-700/85 flex items-center justify-center text-white text-xs px-1.5 text-center">
+          {item.error || 'failed'}
+        </div>
+      )}
+
+      {/* Video play badge */}
+      {item.kind === 'video' && item.status === 'ready' && (
+        <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-sm bg-black/60 text-white text-xs flex items-center gap-1">
+          <span>▶</span> Video
+        </div>
+      )}
+
+      {/* Buttons (top-right) */}
+      <div className="absolute top-1 right-1 flex gap-1">
+        {item.kind === 'photo' && item.status === 'ready' && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="w-6 h-6 rounded-full bg-black/55 text-white text-xs flex items-center justify-center hover:bg-black/80"
+            aria-label="Edit crop"
+            title="Crop & reposition"
+          >
+            ✎
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="w-6 h-6 rounded-full bg-black/55 text-white text-xs flex items-center justify-center hover:bg-rose-600"
+          aria-label="Remove"
+        >
+          ×
+        </button>
+      </div>
     </div>
   )
 }

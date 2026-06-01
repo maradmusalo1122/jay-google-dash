@@ -49,14 +49,24 @@ export default function PhotoModal({ entry, onClose }: Props) {
           <TagChip tag={entry.tag} />
         </div>
 
-        <div className="rounded-md overflow-hidden bg-surface-soft mb-3 aspect-[4/3]">
-          {photo && (
+        <div className="rounded-md overflow-hidden bg-black mb-3 aspect-[4/3] flex items-center justify-center">
+          {photo && photo.kind === 'video' ? (
+            <video
+              key={photo.id}
+              src={photo.url}
+              poster={photo.thumbUrl}
+              controls
+              autoPlay
+              playsInline
+              className="w-full h-full bg-black"
+            />
+          ) : photo ? (
             <img
               src={photo.url}
               alt={photo.label ?? entry.title}
               className="w-full h-full object-cover"
             />
-          )}
+          ) : null}
         </div>
 
         {photos.length > 1 && (
@@ -67,11 +77,22 @@ export default function PhotoModal({ entry, onClose }: Props) {
                 type="button"
                 onClick={() => setActiveIdx(i)}
                 className={cn(
-                  'aspect-square rounded overflow-hidden border-2 transition',
+                  'relative aspect-square rounded overflow-hidden border-2 transition',
                   i === activeIdx ? 'border-g-blue' : 'border-transparent opacity-70 hover:opacity-100',
                 )}
               >
-                <img src={p.thumbUrl ?? p.url} alt={p.label ?? ''} className="w-full h-full object-cover" />
+                {p.kind === 'video' ? (
+                  <>
+                    {p.thumbUrl ? (
+                      <img src={p.thumbUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={p.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                    )}
+                    <span className="absolute inset-0 flex items-center justify-center text-white text-xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">▶</span>
+                  </>
+                ) : (
+                  <img src={p.thumbUrl ?? p.url} alt={p.label ?? ''} className="w-full h-full object-cover" />
+                )}
               </button>
             ))}
           </div>

@@ -54,7 +54,20 @@ interface StoreState {
     tag: Tag
     eventName?: string
     eventDate?: string
-    photoSeeds: string[]
+    /**
+     * Pre-uploaded media items returned by uploadMedia(). Either pass these
+     * (preferred, real uploads) OR photoSeeds (legacy placeholder mode).
+     */
+    media?: Array<{
+      kind: 'photo' | 'video'
+      url: string
+      thumbUrl?: string
+      width?: number
+      height?: number
+      duration?: number
+    }>
+    /** @deprecated use `media` — kept so old callers still compile */
+    photoSeeds?: string[]
   }) => Promise<Entry>
   addUpcomingEvent: (input: {
     authorId: string
@@ -64,7 +77,10 @@ interface StoreState {
     eventDate: string
     venue: string
     venueMapUrl: string
-    photoSeed: string
+    /** Pre-uploaded hero photo (real upload). */
+    hero?: { kind: 'photo' | 'video'; url: string; thumbUrl?: string; width?: number; height?: number }
+    /** @deprecated use `hero` */
+    photoSeed?: string
   }) => Promise<Entry>
   editEntry: (id: string, patch: Partial<Pick<Entry, 'title' | 'caption' | 'tag'>>) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
@@ -238,11 +254,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const addPost: StoreState['addPost'] = useCallback(async (input) => {
-    const photos = input.photoSeeds.map((seed, i) => ({
-      url: photoUrl(seed),
-      thumbUrl: thumbUrl(seed),
-      order: i,
-    }))
+    // Prefer real uploaded media; fall back to placeholder seeds for legacy callers.
+    const photos = input.media
+      ? input.media.map((m, i) => ({
+          kind: m.kind,
+          url: m.url,
+          thumbUrl: m.thumbUrl,
+          width: m.width,
+          height: m.height,
+          duration: m.duration,
+          order: i,
+        }))
+      : (input.photoSeeds ?? []).map((seed, i) => ({
+          kind: 'photo' as const,
+          url: photoUrl(seed),
+          thumbUrl: thumbUrl(seed),
+          order: i,
+        }))
     const { entry } = await api.post<{ entry: Entry }>('/api/entries', {
       type: 'post',
       title: input.title,
@@ -259,6 +287,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addUpcomingEvent: StoreState['addUpcomingEvent'] = useCallback(async (input) => {
     const slug = input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)
+    const heroPhoto = input.hero
+      ? {
+          kind: input.hero.kind,
+          url: input.hero.url,
+          thumbUrl: input.hero.thumbUrl,
+          width: input.hero.width,
+          height: input.hero.height,
+          order: 0,
+        }
+      : input.photoSeed
+        ? { kind: 'photo' as const, url: photoUrl(input.photoSeed), thumbUrl: thumbUrl(input.photoSeed), order: 0 }
+        : null
     const { entry } = await api.post<{ entry: Entry }>('/api/entries', {
       type: 'upcoming_event',
       title: input.title,
@@ -269,7 +309,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       venueMapUrl: input.venueMapUrl,
       publicSlug: slug + '-' + Math.random().toString(36).slice(2, 8),
       contributorIds: [input.authorId],
-      photos: [{ url: photoUrl(input.photoSeed), thumbUrl: thumbUrl(input.photoSeed), order: 0 }],
+      photos: heroPhoto ? [heroPhoto] : [],
     })
     setEntries((prev) => [entry, ...prev])
     return entry
