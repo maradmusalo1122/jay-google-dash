@@ -6,6 +6,7 @@ import UserAvatar from '@/components/ui/UserAvatar'
 import Toast from '@/components/ui/Toast'
 import Modal from '@/components/ui/Modal'
 import PhotoLightbox from '@/components/ui/PhotoLightbox'
+import PhotoCropModal from '@/components/ui/PhotoCropModal'
 import MentionText from '@/components/feed/MentionText'
 import { formatMonthYear, formatShortDate, relativeTime } from '@/lib/format'
 import { parseMentions } from '@/lib/mentions'
@@ -718,6 +719,9 @@ function EditProfileModal({
   const [avatarPhoto, setAvatarPhoto] = useState<string | undefined>(target.avatarPhoto)
   const [coverPhoto, setCoverPhoto] = useState<string | undefined>(target.coverPhoto)
   const [error, setError] = useState<string | null>(null)
+  // Pending image waiting for the user to crop/reposition before we save it
+  const [cropTarget, setCropTarget] = useState<'avatar' | 'cover' | null>(null)
+  const [cropSource, setCropSource] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -734,7 +738,12 @@ function EditProfileModal({
   const avatarFileRef = useRef<HTMLInputElement>(null)
   const coverFileRef = useRef<HTMLInputElement>(null)
 
-  const readFile = (file: File, maxMb: number, setter: (dataUrl: string) => void) => {
+  /**
+   * Read the picked image as a data URL and open the crop+reposition modal.
+   * Whatever the user finalises there lands in avatarPhoto/coverPhoto state
+   * via handleCropSave below.
+   */
+  const pickPhoto = (file: File, maxMb: number, target: 'avatar' | 'cover') => {
     setError(null)
     if (!file.type.startsWith('image/')) {
       setError('Please pick an image file.')
@@ -746,9 +755,24 @@ function EditProfileModal({
     }
     const reader = new FileReader()
     reader.onload = () => {
-      if (typeof reader.result === 'string') setter(reader.result)
+      if (typeof reader.result === 'string') {
+        setCropSource(reader.result)
+        setCropTarget(target)
+      }
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleCropSave = (cropped: string) => {
+    if (cropTarget === 'avatar') setAvatarPhoto(cropped)
+    else if (cropTarget === 'cover') setCoverPhoto(cropped)
+    setCropTarget(null)
+    setCropSource(null)
+  }
+
+  const handleCropCancel = () => {
+    setCropTarget(null)
+    setCropSource(null)
   }
 
   const handleSave = () => {
@@ -777,11 +801,12 @@ function EditProfileModal({
   }
 
   return (
+    <>
     <Modal open={open} onClose={onClose} size="lg">
       <div className="p-5 sm:p-6">
         <h2 className="font-display text-xl mb-1">Edit profile</h2>
         <p className="text-xs text-ink-3 mb-4">
-          Profile and cover photos are stored in your browser for this session. Cloud upload arrives with the backend.
+          Drag and zoom to position your photos inside the crop area before saving.
         </p>
 
         {error && (
@@ -829,7 +854,7 @@ function EditProfileModal({
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) readFile(f, 5, setCoverPhoto)
+              if (f) pickPhoto(f, 5, 'cover')
               e.target.value = ''
             }}
           />
@@ -897,7 +922,7 @@ function EditProfileModal({
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) readFile(f, 2, setAvatarPhoto)
+              if (f) pickPhoto(f, 2, 'avatar')
               e.target.value = ''
             }}
           />
@@ -987,6 +1012,18 @@ function EditProfileModal({
         </div>
       </div>
     </Modal>
+
+    {/* Crop & reposition modal — appears on top when a file is picked */}
+    <PhotoCropModal
+      open={!!cropSource}
+      image={cropSource}
+      shape={cropTarget === 'avatar' ? 'round' : 'rect'}
+      aspect={cropTarget === 'cover' ? 4 : 1}
+      outputSize={cropTarget === 'cover' ? 1600 : 400}
+      onCancel={handleCropCancel}
+      onSave={handleCropSave}
+    />
+    </>
   )
 }
 
