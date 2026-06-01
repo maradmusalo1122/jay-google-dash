@@ -31,14 +31,40 @@ const USERS = [
   { id: 'u-vikram', email: 'vikramj@google.com', name: 'Vikram Joshi', firstName: 'Vikram', avatarInitials: 'VJ', avatarColor: '#7F77DD', role: 'member' as const, status: 'pending' as const, createdAt: new Date('2026-05-27') },
 ]
 
-function pic(seed: string, w = 1200, h = 800) {
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`
+/* ────────────────────────────────────────────────────────────
+ *  CURATED MEDIA LIBRARY
+ *  Themed photos & video for the seed feed. All URLs are public
+ *  CDN endpoints (Unsplash, Picsum, Google's sample video bucket).
+ *  Photos are addressed by ID so they're stable across reseeds.
+ * ──────────────────────────────────────────────────────────── */
+
+function un(id: string, w = 1600) {
+  return `https://images.unsplash.com/photo-${id}?w=${w}&q=80&auto=format&fit=crop`
 }
-function pics(base: string, n: number, labels: string[] = []) {
-  return Array.from({ length: n }, (_, i) => ({
-    url: pic(`${base}-${i}`),
-    thumbUrl: pic(`${base}-${i}`, 480, 360),
-    label: labels[i],
+function pic(id: number | string, w = 1600, h = 900) {
+  // Use specific picsum image ID (stable) rather than random seed
+  return typeof id === 'number'
+    ? `https://picsum.photos/id/${id}/${w}/${h}`
+    : `https://picsum.photos/seed/${encodeURIComponent(id)}/${w}/${h}`
+}
+
+/** Short, royalty-free sample clips hosted on Google's CDN — rock-solid URLs. */
+const VIDEOS = {
+  joyrides: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+  blazes:   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+}
+
+interface SeedPhoto { kind?: 'photo' | 'video'; url: string; thumbUrl?: string; label?: string; order: number }
+
+/** Helper: build a multi-photo set from a list of [url, label] pairs. */
+function set(items: Array<[string, string?]>): SeedPhoto[] {
+  return items.map(([url, label], i) => ({
+    kind: 'photo' as const,
+    url,
+    thumbUrl: url.includes('unsplash.com')
+      ? url.replace(/w=\d+/, 'w=480')
+      : url.replace('/1600/900', '/480/270'),
+    label,
     order: i,
   }))
 }
@@ -57,7 +83,7 @@ const ENTRIES: Array<{
   venueMapUrl?: string
   publicSlug?: string
   contributorIds: string[]
-  photos: Array<{ url: string; thumbUrl?: string; label?: string; order: number }>
+  photos: SeedPhoto[]
   createdAt: Date
 }> = [
   // ── Q2 2026 — upcoming events ──
@@ -69,7 +95,10 @@ const ENTRIES: Array<{
     venue: 'Sofitel Mumbai BKC, Bandra-Kurla Complex',
     venueMapUrl: 'https://maps.google.com/?q=Sofitel+Mumbai+BKC',
     publicSlug: 'affiliate-mixer-mumbai-jun-2026',
-    photos: pics('mumbai-mixer-hero', 1, ['Sofitel Mumbai BKC']),
+    // Mumbai skyline at night — Bandra-Kurla / Marine Drive vibe for the hero
+    photos: set([
+      [un('1570168007204-dfb528c6958f'), 'Sofitel Mumbai BKC at night'],
+    ]),
     contributorIds: ['u-ramneek'], createdAt: new Date('2026-05-26T12:00:00Z'),
   },
   {
@@ -80,7 +109,9 @@ const ENTRIES: Array<{
     venue: 'Burnt Ends, 7 Dempsey Road, Singapore',
     venueMapUrl: 'https://maps.google.com/?q=Burnt+Ends+Singapore+Dempsey',
     publicSlug: 'sea-networking-dinner-jun-2026',
-    photos: pics('sg-dinner-hero', 1, ['Burnt Ends']),
+    photos: set([
+      [un('1508964942454-1a56651d54ac'), 'Marina Bay Sands'],
+    ]),
     contributorIds: ['u-jasmine'], createdAt: new Date('2026-05-24T08:00:00Z'),
   },
 
@@ -88,9 +119,26 @@ const ENTRIES: Array<{
   {
     id: 'e-surat-mixer', quarterId: 'q2-2026', authorId: 'u-nikhil', type: 'post',
     title: 'Google Affiliate Partnership Mixer — Surat',
-    caption: 'Surat showed up. 40+ new publishers, deep conversations about content monetisation, and three product demos that landed exactly right. Big thanks to the local team for the warm welcome.',
+    caption: 'Surat showed up. 40+ new publishers, deep conversations about content monetisation, and three product demos that landed exactly right. Big thanks to the local team for the warm welcome. Short clip from the opening reel below 👇',
     tag: 'team_event', eventName: 'Affiliate Partnership Mixer', eventDate: new Date('2026-05-22T18:00:00Z'),
-    photos: pics('surat-mixer', 5, ['Welcome desk', 'Opening keynote', 'Group photo', 'Q&A session', 'Dinner']),
+    photos: [
+      // 5 photos + a 15s clip at position 2 (showcases video rendering in the gallery)
+      ...set([
+        [un('1559136555-9303baea8ebd'), 'Welcome desk + Google branding'],
+        [un('1511578314322-379afb476865'), 'Opening keynote — packed room'],
+      ]),
+      {
+        kind: 'video', order: 2,
+        url: VIDEOS.joyrides,
+        thumbUrl: un('1505373877841-8d25f7d46678', 480),
+        label: '15-second clip from the opening',
+      },
+      ...set([
+        [un('1540575467063-178a50c2df87'), 'Q&A session'],
+        [un('1591115765373-5207764f72e7'), 'Networking over drinks'],
+        [un('1559339352-11d035aa65de'), 'Dinner — long-table'],
+      ]).map((p, i) => ({ ...p, order: 3 + i })),
+    ],
     contributorIds: ['u-nikhil', 'u-priya', 'u-ramneek'], createdAt: new Date('2026-05-23T11:00:00Z'),
   },
   {
@@ -98,7 +146,12 @@ const ENTRIES: Array<{
     title: 'Social Beat Summit — Ramneek on Stage',
     caption: 'Ramneek led the panel on affiliate growth for SMBs. The audience asked the smart questions, and the after-panel queue lasted longer than the panel itself. Proud moment for the team.',
     tag: 'team_win', eventName: 'Social Beat Marketing Summit', eventDate: new Date('2026-04-18T14:00:00Z'),
-    photos: pics('social-beat', 3, ['On stage', 'Panel discussion', 'After-panel network']),
+    photos: set([
+      [un('1505373877841-8d25f7d46678'), 'Ramneek on stage'],
+      [un('1517048676732-d65bc937f952'), 'Panel discussion'],
+      [un('1559223607-a43c990c692c'), 'Audience hands up'],
+      [un('1475721027785-f74eccf877e2'), 'After-panel queue'],
+    ]),
     contributorIds: ['u-ramneek', 'u-priya'], createdAt: new Date('2026-04-19T09:00:00Z'),
   },
   {
@@ -106,7 +159,12 @@ const ENTRIES: Array<{
     title: "Niketa's Wedding 🎉",
     caption: "Half the team flew in for Niketa's wedding. Three days of celebration, sangeet that ran past midnight, and a baraat that the hotel will remember. Wishing her and Karan the best.",
     tag: 'life_outside', eventName: 'Team milestone', eventDate: new Date('2026-04-08T17:00:00Z'),
-    photos: pics('niketa-wedding', 4, ['The couple', 'Sangeet night', 'NBS table', 'After the ceremony']),
+    photos: set([
+      [un('1583939411023-14783179e581'), 'The mandap'],
+      [un('1606216794074-735e91aa5c9d'), 'The couple'],
+      [un('1535025183041-0991a977e25b'), 'Floral arrangements'],
+      [un('1519741497674-611481863552'), 'NBS table at the reception'],
+    ]),
     contributorIds: ['u-jasmine', 'u-tina', 'u-abhishek'], createdAt: new Date('2026-04-10T20:00:00Z'),
   },
 
@@ -116,7 +174,13 @@ const ENTRIES: Array<{
     title: 'ENGAGE 2026 — Team Dinner',
     caption: 'ENGAGE 2026, Macau. The India and Singapore teams around one table — strategy sessions by day, laughter by night. This is what the NBS SAPAC family looks like.',
     tag: 'team_event', eventName: 'ENGAGE 2026', eventDate: new Date('2026-03-06T19:00:00Z'),
-    photos: pics('engage-dinner', 4, ['The whole SAPAC family', 'Toast', 'India + SG together', 'Late night']),
+    photos: set([
+      [un('1414235077428-338989a2e8c0'), 'The whole SAPAC family at the table'],
+      [un('1559339352-11d035aa65de'), 'Toast'],
+      [un('1517248135467-4c7edcad34c4'), 'India + SG together'],
+      [un('1543269865-cbf427effbad'), 'Strategy session — laptops out'],
+      [un('1525625293386-3f8f99389edd'), 'Macau by night'],
+    ]),
     contributorIds: ['u-abhishek', 'u-jasmine', 'u-priya', 'u-nikhil'], createdAt: new Date('2026-03-07T08:00:00Z'),
   },
   {
@@ -124,7 +188,12 @@ const ENTRIES: Array<{
     title: 'ENGAGE 2026 — The Banner Shot',
     caption: 'Macau called. We answered. All of us. ENGAGE 2026 wrapped with this shot — the NBS SAPAC banner held high by two countries, one team.',
     tag: 'team_event', eventName: 'ENGAGE 2026', eventDate: new Date('2026-03-07T12:00:00Z'),
-    photos: pics('engage-banner', 2, ['The banner', 'Behind the scenes']),
+    photos: set([
+      [un('1556761175-5973dc0f32e7'), 'The banner shot'],
+      [un('1582213782179-e0d53f98f2ca'), 'Behind the scenes — setting up'],
+      [un('1531058020387-3be344556be6'), 'Crowd reaction'],
+      [un('1573164713619-24c711fe7878'), 'Group selfie after'],
+    ]),
     contributorIds: ['u-priya', 'u-jasmine', 'u-abhishek'], createdAt: new Date('2026-03-08T10:00:00Z'),
   },
   {
@@ -132,7 +201,12 @@ const ENTRIES: Array<{
     title: 'AdTech Marketing Conference',
     caption: 'Two days of AdTech, three NBS sessions, one big takeaway: the industry is hungry for stronger publisher tooling. Plenty of homework brought back to the team.',
     tag: 'external', eventName: 'AdTech Marketing Conference', eventDate: new Date('2026-03-21T09:00:00Z'),
-    photos: pics('adtech', 3, ['NBS booth', 'Conference floor', 'Day 2 closing']),
+    photos: set([
+      [un('1515187029135-18ee286d815b'), 'NBS booth'],
+      [un('1511578314322-379afb476865'), 'Conference floor'],
+      [un('1531058020387-3be344556be6'), 'Audience'],
+      [un('1497366216548-37526070297c'), 'Day 2 closing'],
+    ]),
     contributorIds: ['u-aditya', 'u-tina'], createdAt: new Date('2026-03-22T15:00:00Z'),
   },
 
@@ -142,7 +216,12 @@ const ENTRIES: Array<{
     title: 'Affiliate Ecomm Growth Playbook Webinar',
     caption: 'Jasmine, Aditya and Tina took the stage with DFO Network — breaking down the Affiliate Ecomm Growth Playbook for the shopping season. Recording is on the drive.',
     tag: 'team_win', eventName: 'DFO Network', eventDate: new Date('2025-11-14T15:00:00Z'),
-    photos: pics('webinar', 2, ['On the webinar', 'The team after']),
+    photos: set([
+      [un('1591115765373-5207764f72e7'), 'On the webinar — 3-up layout'],
+      [un('1517048676732-d65bc937f952'), 'Walking through the playbook'],
+      [un('1543269865-cbf427effbad'), 'Q&A flood at the end'],
+      [un('1573164713619-24c711fe7878'), 'The team debrief after'],
+    ]),
     contributorIds: ['u-jasmine', 'u-aditya', 'u-tina'], createdAt: new Date('2025-11-15T09:00:00Z'),
   },
   {
@@ -150,7 +229,12 @@ const ENTRIES: Array<{
     title: 'UC Berkeley — Google Business Leadership Program',
     caption: 'Nikhil, Gunjeeta and teammates graduating from the Google Business Leadership Program at UC Berkeley. Certificates in hand, energy through the roof.',
     tag: 'learning', eventName: 'UC Berkeley', eventDate: new Date('2025-11-22T17:00:00Z'),
-    photos: pics('berkeley', 3, ['Graduation day', 'NBS cohort', 'Campus tour']),
+    photos: set([
+      [un('1523050854058-8df90110c9f1'), 'Berkeley campus'],
+      [un('1607237138185-eedd9c632b0b'), 'Graduation day — caps in air'],
+      [un('1556761175-5973dc0f32e7'), 'NBS cohort'],
+      [pic(219), 'Campus architecture'],
+    ]),
     contributorIds: ['u-nikhil', 'u-gunjeeta'], createdAt: new Date('2025-11-23T07:00:00Z'),
   },
 ]
@@ -248,6 +332,7 @@ async function main() {
       await prisma.photo.createMany({
         data: photos.map((p) => ({
           entryId: e.id,
+          kind: p.kind ?? 'photo',
           url: p.url,
           thumbUrl: p.thumbUrl,
           label: p.label,
