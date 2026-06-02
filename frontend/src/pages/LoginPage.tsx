@@ -1,9 +1,19 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import GoogleLogo from '@/components/GoogleLogo'
 import GoogleWordmark from '@/components/GoogleWordmark'
 import { useAuth } from '@/lib/auth'
 import { api, ApiError } from '@/lib/api'
+
+// Friendly text for the ?error= codes the Google OAuth callback can redirect with.
+const OAUTH_ERRORS: Record<string, string> = {
+  domain_mismatch: 'Please sign in with your @google.com work account.',
+  oauth_failed: 'Google sign-in did not complete. Please try again.',
+  missing_code: 'Google sign-in was cancelled. Please try again.',
+  no_id_token: 'Google did not return your identity. Please try again.',
+  bad_payload: 'Google did not share an email for this account.',
+  google_oauth_not_configured: 'Google sign-in is not set up yet on the server.',
+}
 
 /**
  * Login page — pixel-faithful to the prototype.
@@ -15,9 +25,14 @@ import { api, ApiError } from '@/lib/api'
  */
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { signIn, startGoogleOAuth } = useAuth()
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    searchParams.get('error') ? (OAUTH_ERRORS[searchParams.get('error')!] ?? 'Sign-in failed. Please try again.') : null,
+  )
+  // A brand-new teammate who just signed in but is awaiting admin approval.
+  const isPending = searchParams.get('pending') === '1'
 
   const handleSignIn = async (userId: string = 'u-abhishek') => {
     setBusy(true)
@@ -51,6 +66,15 @@ export default function LoginPage() {
         <p className="text-sm text-ink-3 leading-relaxed mb-5">
           Sign in with your Google NBS account to access the team memory vault.
         </p>
+
+        {isPending && (
+          <div className="mb-4 rounded-sm border border-amber-200 bg-amber-50 px-3 py-2.5 text-left">
+            <p className="text-xs font-medium text-amber-900">You&rsquo;re almost in</p>
+            <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+              Your Google account was verified. An admin needs to approve you before you can see the Chronicle. You&rsquo;ll get access as soon as they do.
+            </p>
+          </div>
+        )}
 
         <button
           type="button"

@@ -7,11 +7,17 @@ import { requireAuth } from '@/middleware/auth'
 
 const router = Router()
 
-const HOSTED_DOMAIN = process.env.GOOGLE_HOSTED_DOMAIN || 'google.com'
+// Restrict sign-in to one Google Workspace domain. Set GOOGLE_HOSTED_DOMAIN=""
+// (empty) to allow ANY Google account — handy for testing. `??` (not `||`) so an
+// explicit empty string is respected instead of falling back to the default.
+const HOSTED_DOMAIN = (process.env.GOOGLE_HOSTED_DOMAIN ?? 'google.com').trim()
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ''
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || ''
 const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:5173'
+// APP_ORIGIN can be a comma-separated allowlist (used for CORS). OAuth redirects
+// need ONE concrete URL, so take the first entry and strip any trailing slash.
+const APP_URL = APP_ORIGIN.split(',')[0].trim().replace(/\/$/, '')
 const ALLOW_DEV_SIGNIN = process.env.ALLOW_DEV_SIGNIN === 'true' || process.env.NODE_ENV !== 'production'
 
 const googleClient =
@@ -74,7 +80,8 @@ router.get('/google', (_req: Request, res: Response) => {
   const url = googleClient.generateAuthUrl({
     access_type: 'online',
     scope: ['openid', 'email', 'profile'],
-    hd: HOSTED_DOMAIN,
+    // Only hint the domain to Google when we actually restrict to one.
+    ...(HOSTED_DOMAIN ? { hd: HOSTED_DOMAIN } : {}),
     prompt: 'select_account',
   })
   res.redirect(url)
@@ -88,12 +95,12 @@ router.get('/google', (_req: Request, res: Response) => {
 router.get('/google/callback', async (req: Request, res: Response) => {
   if (!googleClient) return res.status(500).send('Google OAuth not configured')
   const code = req.query.code as string | undefined
-  if (!code) return res.redirect(`${APP_ORIGIN}/login?error=missing_code`)
+  if (!code) return res.redirect(`${APP_URL}/login?error=missing_code`)
 
   try {
     const { tokens } = await googleClient.getToken(code)
     const idToken = tokens.id_token
-    if (!idToken) return res.redirect(`${APP_ORIGIN}/login?error=no_id_token`)
+    if (!idToken) return res.redirect(`${APP_URL}/login?error=no_id_token`)
 
     const ticket = await googleClient.verifyIdToken({
       idToken,
@@ -101,13 +108,15 @@ router.get('/google/callback', async (req: Request, res: Response) => {
     })
     const payload = ticket.getPayload()
     if (!payload?.email || !payload.sub) {
-      return res.redirect(`${APP_ORIGIN}/login?error=bad_payload`)
+      return res.redirect(`${APP_URL}/login?error=bad_payload`)
     }
-    if (payload.hd !== HOSTED_DOMAIN) {
-      return res.redirect(`${APP_ORIGIN}/login?error=domain_mismatch`)
+    // Enforce the workspace domain only when one is configured.
+    if (HOSTED_DOMAIN && payload.hd !== HOSTED_DOMAIN) {
+      return res.redirect(`${APP_URL}/login?error=domain_mismatch`)
     }
 
-    const name = payload.name || payload.email.split('@')[0]
+    const email = payload.email.toLowerCase()
+    const name = payload.name || email.split('@')[0]
     const firstName = (payload.given_name || name.split(' ')[0]).trim()
     const initials = name
       .split(/\s+/)
@@ -116,30 +125,50 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       .slice(0, 2)
       .toUpperCase()
 
-    // Upsert by googleId. New users land in pending status.
-    const user = await prisma.user.upsert({
-      where: { googleId: payload.sub },
-      update: { lastActiveAt: new Date() },
-      create: {
-        googleId: payload.sub,
-        email: payload.email,
-        name,
-        firstName,
-        avatarInitials: initials,
-        avatarColor: '#4285F4',
-        avatarPhoto: payload.picture || undefined,
-        role: 'member',
-        status: 'pending',
-        lastActiveAt: new Date(),
-      },
-    })
+    // Link the Google identity to a teammate BY EMAIL. This matters because:
+    //   1. Existing members (incl. the seed admin) already have their email on
+    //      file with a placeholder googleId. Matching by email links the real
+    //      Google account and PRESERVES their role/status (so the admin stays an
+    //      admin). Matching by googleId would instead hit the unique-email
+    //      constraint and fail.
+    //   2. Brand-new teammates (email not on file) are created as "pending" and
+    //      wait for an admin to approve them.
+    const existing = await prisma.user.findUnique({ where: { email } })
+    let user
+    if (existing) {
+      user = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          googleId: payload.sub,
+          lastActiveAt: new Date(),
+          avatarPhoto: existing.avatarPhoto ?? (payload.picture || undefined),
+        },
+      })
+    } else {
+      user = await prisma.user.create({
+        data: {
+          googleId: payload.sub,
+          email,
+          name,
+          firstName,
+          avatarInitials: initials,
+          avatarColor: '#4285F4',
+          avatarPhoto: payload.picture || undefined,
+          role: 'member',
+          status: 'pending',
+          lastActiveAt: new Date(),
+        },
+      })
+    }
 
     res.cookie(COOKIE_NAME, signSession(user.id), cookieOptions())
-    res.redirect(`${APP_ORIGIN}/`)
+    // New, not-yet-approved teammates land on a friendly "pending" screen.
+    const dest = user.status === 'pending' ? '/login?pending=1' : '/'
+    res.redirect(`${APP_URL}${dest}`)
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[auth] google callback error', e)
-    res.redirect(`${APP_ORIGIN}/login?error=oauth_failed`)
+    res.redirect(`${APP_URL}/login?error=oauth_failed`)
   }
 })
 
