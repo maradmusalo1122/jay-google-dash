@@ -22,8 +22,13 @@ export default function AppShell() {
 
   return (
     <div className="min-h-full flex flex-col">
-      <Topbar />
-      <NavRow />
+      {/* Topbar + tabs stay pinned together so navigation is always reachable,
+          however far the user has scrolled. Wrapping both keeps the tabs
+          directly under the logo bar even when the Topbar wraps on mobile. */}
+      <div className="sticky top-0 z-50 shadow-sm">
+        <Topbar />
+        <NavRow />
+      </div>
       <main className="flex-1 w-full">
         <div className="max-w-page mx-auto px-4 sm:px-6 py-5">
           <Outlet />

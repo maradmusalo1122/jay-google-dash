@@ -17,7 +17,7 @@ export default function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-surface border-b border-line">
+    <header className="bg-surface border-b border-line">
       <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 flex-wrap">
         {/* Logo */}
         <button
