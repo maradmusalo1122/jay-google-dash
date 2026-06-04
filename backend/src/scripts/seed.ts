@@ -19,7 +19,7 @@ const QUARTERS = [
 
 // Users
 const USERS = [
-  { id: 'u-abhishek', email: 'abhishek@google.com', name: 'Abhishek Chopra', firstName: 'Abhishek', avatarInitials: 'AC', avatarColor: '#4285F4', office: 'IN', team: 'People Pillar', role: 'admin' as const, status: 'approved' as const, createdAt: new Date('2025-08-01') },
+  { id: 'u-abhishek', email: 'chopraabhishek@google.com', name: 'Abhishek Chopra', firstName: 'Abhishek', avatarInitials: 'AC', avatarColor: '#4285F4', office: 'IN', team: 'People Pillar', role: 'admin' as const, status: 'approved' as const, createdAt: new Date('2025-08-01') },
   { id: 'u-priya', email: 'priyasharma@google.com', name: 'Priya Sharma', firstName: 'Priya', avatarInitials: 'PS', avatarColor: '#EA4335', office: 'IN', team: 'DFO Network', role: 'member' as const, status: 'approved' as const, createdAt: new Date('2025-08-12') },
   { id: 'u-nikhil', email: 'nikhilsingh@google.com', name: 'Nikhil Singh', firstName: 'Nikhil', avatarInitials: 'NS', avatarColor: '#34A853', office: 'IN', team: 'Affiliate Partnerships', role: 'member' as const, status: 'approved' as const, createdAt: new Date('2025-09-01') },
   { id: 'u-ramneek', email: 'ramneekk@google.com', name: 'Ramneek Kaur', firstName: 'Ramneek', avatarInitials: 'RK', avatarColor: '#FBBC05', office: 'IN', team: 'Affiliate Partnerships', role: 'member' as const, status: 'approved' as const, createdAt: new Date('2025-09-15') },
