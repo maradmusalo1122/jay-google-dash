@@ -36,3 +36,5 @@ coverage/
 # Misc
 *.tsbuildinfo
 .cache/
+docs/_build/vframes/
+docs/_build/vidserve.js
