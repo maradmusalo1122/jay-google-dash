@@ -1,9 +1,7 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import GoogleLogo from '@/components/GoogleLogo'
 import GoogleWordmark from '@/components/GoogleWordmark'
 import { useAuth } from '@/lib/auth'
-import { api, ApiError } from '@/lib/api'
 
 // Friendly text for the ?error= codes the Google OAuth callback can redirect with.
 const OAUTH_ERRORS: Record<string, string> = {
@@ -16,42 +14,16 @@ const OAUTH_ERRORS: Record<string, string> = {
 }
 
 /**
- * Login page — pixel-faithful to the prototype.
- *
- * Two sign-in paths:
- *  - "Continue with Google" → real OAuth (redirects to /api/auth/google)
- *  - "Dev shortcuts" → POST /api/auth/dev-signin (only enabled while
- *    backend has ALLOW_DEV_SIGNIN=true)
+ * Login page. Sign-in is Google SSO only (restricted to @google.com).
  */
 export default function LoginPage() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { signIn, startGoogleOAuth } = useAuth()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(
-    searchParams.get('error') ? (OAUTH_ERRORS[searchParams.get('error')!] ?? 'Sign-in failed. Please try again.') : null,
-  )
+  const { startGoogleOAuth } = useAuth()
+
+  const errCode = searchParams.get('error')
+  const error = errCode ? OAUTH_ERRORS[errCode] ?? 'Sign-in failed. Please try again.' : null
   // A brand-new teammate who just signed in but is awaiting admin approval.
   const isPending = searchParams.get('pending') === '1'
-
-  const handleSignIn = async (userId: string = 'u-abhishek') => {
-    setBusy(true)
-    setError(null)
-    try {
-      await signIn(userId)
-      navigate('/feed')
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 403 && e.code === 'dev_signin_disabled') {
-        setError('Dev sign-in is disabled — use "Continue with Google".')
-      } else if (e instanceof ApiError && e.status === 404) {
-        setError('Demo user not found. Did the seed run?')
-      } else {
-        setError('Sign-in failed. Backend reachable?')
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div className="min-h-full flex items-center justify-center px-4 py-8">
@@ -79,8 +51,7 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={startGoogleOAuth}
-          disabled={busy}
-          className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-sm border border-line-strong bg-surface hover:bg-surface-soft transition text-md font-medium disabled:opacity-60"
+          className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-sm border border-line-strong bg-surface hover:bg-surface-soft transition text-md font-medium"
         >
           <GoogleWordmark />
           <span className="text-ink">Continue with Google</span>
@@ -90,62 +61,8 @@ export default function LoginPage() {
           @google.com accounts only &middot; NBS SAPAC team
         </p>
 
-        {error && (
-          <p className="text-xs text-rose-600 mt-3">{error}</p>
-        )}
-
-        {/* Dev affordances — only work while the backend allows dev sign-in */}
-        <div className="border-t border-line mt-5 pt-3 space-y-1.5">
-          <p className="text-[10px] text-ink-3 uppercase tracking-wider">Dev shortcuts</p>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleSignIn('u-abhishek')}
-            className="block w-full text-[11px] text-ink-2 hover:text-g-blue disabled:opacity-60"
-          >
-            Log in as Abhishek (Admin)
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleSignIn('u-priya')}
-            className="block w-full text-[11px] text-ink-2 hover:text-g-blue disabled:opacity-60"
-          >
-            Log in as Priya (Member, no Dashboard)
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleSignIn('u-tina')}
-            className="block w-full text-[11px] text-ink-2 hover:text-g-blue disabled:opacity-60"
-          >
-            Log in as Tina (Member, SG office)
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/pending')}
-            className="block w-full text-[11px] text-ink-2 hover:text-g-blue"
-          >
-            Preview pending-approval page
-          </button>
-        </div>
-
-        {/* Backend status hint for testing */}
-        <BackendHealth />
+        {error && <p className="text-xs text-rose-600 mt-3">{error}</p>}
       </div>
     </div>
-  )
-}
-
-function BackendHealth() {
-  const [status, setStatus] = useState<'?' | 'ok' | 'down'>('?')
-  useState(() => {
-    api.get('/api/health').then(() => setStatus('ok')).catch(() => setStatus('down'))
-  })
-  if (status === '?') return null
-  return (
-    <p className={`text-[10px] mt-3 ${status === 'ok' ? 'text-emerald-600' : 'text-rose-600'}`}>
-      backend: {status === 'ok' ? 'reachable' : 'unreachable'}
-    </p>
   )
 }
