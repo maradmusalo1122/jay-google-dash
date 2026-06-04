@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "tsx src/scripts/seed.ts",
+    "reset:fresh": "tsx src/scripts/reset-fresh.ts",
     "deploy:setup": "prisma generate && prisma migrate deploy"
   },
   "dependencies": {
