@@ -15,11 +15,10 @@ import { cn } from '@/lib/cn'
 
 const OFFICES: Office[] = ['IN', 'SG']
 const TEAMS = [
-  'People Pillar',
-  'DFO Network',
-  'Affiliate Partnerships',
-  'Engagement',
-  'Operations',
+  'NBS Gurgaon',
+  'NBS Mumbai',
+  'NBS Bangalore',
+  'NBS SEA',
 ]
 const AVATAR_COLORS = [
   '#4285F4', '#EA4335', '#FBBC05', '#34A853',

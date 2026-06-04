@@ -35,7 +35,7 @@ const ADMIN = {
   avatarInitials: 'AC',
   avatarColor: '#4285F4',
   office: 'IN',
-  team: 'People Pillar',
+  team: 'NBS Gurgaon',
   role: 'admin' as const,
   status: 'approved' as const,
   createdAt: new Date('2025-08-01'),
