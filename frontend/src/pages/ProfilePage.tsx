@@ -68,11 +68,13 @@ export default function ProfilePage() {
     () => new Set(reactions.filter((r) => r.userId === tid && r.type === 'going').map((r) => r.entryId)),
     [reactions, tid],
   )
-  // Things they were part of but didn't author: tagged contributor OR going.
+  // Entries this person is credited on — i.e. shown in the post's "contributed"
+  // list (which is exactly `contributorIds`, and the author is always in it),
+  // OR events they RSVP'd "Going" to. This matches what the feed displays.
   const contributedEntries = useMemo(
     () =>
       entries
-        .filter((e) => e.authorId !== tid && (e.contributorIds.includes(tid) || goingEntryIds.has(e.id)))
+        .filter((e) => e.contributorIds.includes(tid) || goingEntryIds.has(e.id))
         .slice()
         .sort(byNewest),
     [entries, tid, goingEntryIds],
@@ -391,17 +393,15 @@ function ProfileStats({
   const commentsCount = comments.filter((c) => c.userId === target.id).length
   const goingCount = reactions.filter((r) => r.userId === target.id && r.type === 'going').length
 
-  // "Contributed" — moments the user was part of but didn't author themselves:
-  // entries where they're listed as a contributor, OR events they RSVP'd "going" to.
-  // Authored entries are excluded (those are counted under Posts) so the two
-  // numbers don't double-count.
+  // "Contributed" — entries this person is credited on: shown in the post's
+  // "contributed" list (= `contributorIds`, which always includes the author),
+  // OR events they RSVP'd "going" to. This matches exactly what the feed shows,
+  // so a post that displays "X contributed" counts toward X's Contributed.
   const goingEntryIds = new Set(
     reactions.filter((r) => r.userId === target.id && r.type === 'going').map((r) => r.entryId),
   )
   const contributedCount = entries.filter(
-    (e) =>
-      e.authorId !== target.id &&
-      (e.contributorIds.includes(target.id) || goingEntryIds.has(e.id)),
+    (e) => e.contributorIds.includes(target.id) || goingEntryIds.has(e.id),
   ).length
 
   const stats: Array<{ n: number; label: string; view: Tab }> = [
