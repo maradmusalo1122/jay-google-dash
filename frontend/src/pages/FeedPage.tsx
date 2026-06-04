@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useStore } from '@/lib/store'
 import StatCard from '@/components/ui/StatCard'
 import PostCard from '@/components/feed/PostCard'
@@ -8,10 +9,29 @@ import Toast from '@/components/ui/Toast'
 import type { Entry } from '@/types'
 
 export default function FeedPage() {
-  const { entries, selectedQuarter, isViewingLive, loading } = useStore()
+  const { entries, selectedQuarter, isViewingLive, loading, setSelectedQuarter } = useStore()
+  const [searchParams] = useSearchParams()
   const [openPhotoEntry, setOpenPhotoEntry] = useState<Entry | null>(null)
   const [openPhotoIndex, setOpenPhotoIndex] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Deep link from a shared post link (/feed?post=<id>): switch to that post's
+  // quarter, then scroll to it and briefly highlight it.
+  const sharedPostId = searchParams.get('post')
+  useEffect(() => {
+    if (!sharedPostId || loading) return
+    const target = entries.find((e) => e.id === sharedPostId)
+    if (!target) return
+    if (target.quarterId !== selectedQuarter.id) setSelectedQuarter(target.quarterId)
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`entry-${sharedPostId}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-g-blue', 'ring-offset-2')
+      setTimeout(() => el.classList.remove('ring-2', 'ring-g-blue', 'ring-offset-2'), 2600)
+    }, 450)
+    return () => clearTimeout(timer)
+  }, [sharedPostId, loading, entries, selectedQuarter.id, setSelectedQuarter])
 
   const openPhoto = (entry: Entry, index = 0) => {
     setOpenPhotoEntry(entry)

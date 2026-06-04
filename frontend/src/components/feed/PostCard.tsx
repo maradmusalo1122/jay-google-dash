@@ -6,6 +6,7 @@ import ContributorAvatars from './ContributorAvatars'
 import CommentRow, { type CommentRowHandle } from './CommentRow'
 import MentionText from './MentionText'
 import PostMediaCarousel from './PostMediaCarousel'
+import PostActions from './PostActions'
 import { cn } from '@/lib/cn'
 import type { Entry } from '@/types'
 import { formatShortDate } from '@/lib/format'
@@ -49,7 +50,10 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
             {entry.eventDate ? formatShortDate(entry.eventDate) : ''}
           </div>
         </div>
-        <TagChip tag={entry.tag} />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <TagChip tag={entry.tag} />
+          <PostActions entry={entry} />
+        </div>
       </div>
 
       {/* Inline media carousel — swipe, arrows, dots, counter */}
