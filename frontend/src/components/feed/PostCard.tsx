@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useStore } from '@/lib/store'
 import { useAuth } from '@/lib/auth'
 import TagChip from '@/components/ui/TagChip'
@@ -7,9 +7,11 @@ import CommentRow, { type CommentRowHandle } from './CommentRow'
 import MentionText from './MentionText'
 import PostMediaCarousel from './PostMediaCarousel'
 import PostActions from './PostActions'
+import Toast from '@/components/ui/Toast'
 import { cn } from '@/lib/cn'
 import type { Entry } from '@/types'
 import { formatShortDate } from '@/lib/format'
+import { sharePost } from '@/lib/share'
 
 interface Props {
   entry: Entry
@@ -20,8 +22,15 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
   const { hasReaction, toggleReaction } = useStore()
   const { currentUser } = useAuth()
   const commentRowRef = useRef<CommentRowHandle>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   const liked = currentUser ? hasReaction(entry.id, currentUser.id, 'like') : false
+
+  const handleShare = async () => {
+    const result = await sharePost(entry)
+    if (result === 'copied') setToast('Link copied — paste it in WhatsApp, email, anywhere')
+    else if (result === 'failed') setToast('Could not share. Try Copy link from the ⋯ menu.')
+  }
 
   // Order photos with the hero first, then the rest by their stored order.
   const orderedPhotos = useMemo(() => {
@@ -52,7 +61,7 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <TagChip tag={entry.tag} />
-          <PostActions entry={entry} />
+          <PostActions entry={entry} onNotify={setToast} />
         </div>
       </div>
 
@@ -95,6 +104,14 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
         >
           💬 Comment
         </button>
+        <button
+          type="button"
+          onClick={handleShare}
+          className="flex items-center gap-1 text-sm text-ink-3 hover:bg-surface-soft px-2 py-1 rounded-sm"
+        >
+          <span aria-hidden>↗</span>
+          <span>Share</span>
+        </button>
         <ContributorAvatars
           ids={entry.contributorIds}
           label="contributed"
@@ -104,6 +121,7 @@ export default function PostCard({ entry, onOpenPhoto }: Props) {
       </div>
 
       <CommentRow ref={commentRowRef} entryId={entry.id} />
+      <Toast message={toast} onDone={() => setToast(null)} />
     </article>
   )
 }

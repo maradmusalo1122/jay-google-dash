@@ -2,28 +2,32 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { useStore } from '@/lib/store'
 import Modal from '@/components/ui/Modal'
-import Toast from '@/components/ui/Toast'
 import MentionInput from './MentionInput'
 import { ALL_TAGS, type Entry, type Tag } from '@/types'
 import { deserializeMentions } from '@/lib/mentions'
+import { copyPostLink } from '@/lib/share'
 import { cn } from '@/lib/cn'
 
 /**
- * The "⋯" menu shown on every post card.
- *  - Edit / Delete: only for the post's author or an admin (also enforced server-side).
- *  - Share / Copy link: anyone. The link opens the post inside the app, so only
- *    signed-in teammates can actually view it.
+ * The "⋯" management menu on a post card. Shown only to the post's author or an
+ * admin (edit + delete are also enforced server-side). Sharing/copying the link
+ * lives in the main actions row (the Share button), like other social apps, so
+ * it isn't duplicated here.
  */
-export default function PostActions({ entry }: { entry: Entry }) {
+export default function PostActions({
+  entry,
+  onNotify,
+}: {
+  entry: Entry
+  onNotify: (msg: string) => void
+}) {
   const { currentUser } = useAuth()
   const { deleteEntry } = useStore()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   const canManage = !!currentUser && (currentUser.id === entry.authorId || currentUser.role === 'admin')
-  const shareUrl = `${window.location.origin}/feed?post=${entry.id}`
 
   useEffect(() => {
     if (!open) return
@@ -34,37 +38,20 @@ export default function PostActions({ entry }: { entry: Entry }) {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
-  const doShare = async () => {
-    setOpen(false)
-    const data = { title: entry.title, text: `${entry.title} — NBS SAPAC Chronicle`, url: shareUrl }
-    // navigator.share opens the phone's native sheet (WhatsApp, Mail, etc.)
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share(data)
-      } catch {
-        /* user cancelled the share sheet — ignore */
-      }
-      return
-    }
-    await copyLink('Sharing not supported here — link copied instead')
-  }
+  // Nothing to manage → no menu (everyone shares via the Share button in the row).
+  if (!canManage) return null
 
-  const copyLink = async (msg = 'Link copied — paste it in WhatsApp, email, anywhere') => {
+  const copyLink = async () => {
     setOpen(false)
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setToast(msg)
-    } catch {
-      setToast(shareUrl)
-    }
+    onNotify((await copyPostLink(entry.id)) ? 'Link copied to clipboard' : 'Could not copy the link')
   }
 
   const doDelete = () => {
     setOpen(false)
     if (!window.confirm(`Delete "${entry.title}"? This can't be undone.`)) return
     deleteEntry(entry.id)
-      .then(() => setToast('Post deleted'))
-      .catch(() => setToast('Could not delete the post'))
+      .then(() => onNotify('Post deleted'))
+      .catch(() => onNotify('Could not delete the post'))
   }
 
   return (
@@ -85,22 +72,15 @@ export default function PostActions({ entry }: { entry: Entry }) {
           role="menu"
           className="absolute right-0 top-9 z-30 w-48 bg-surface border border-line rounded-md shadow-lg py-1 overflow-hidden"
         >
-          {canManage && (
-            <MenuItem onClick={() => { setOpen(false); setEditing(true) }}>
-              <span aria-hidden>✏️</span> Edit post
-            </MenuItem>
-          )}
-          <MenuItem onClick={doShare}>
-            <span aria-hidden>🔗</span> Share…
+          <MenuItem onClick={() => { setOpen(false); setEditing(true) }}>
+            <span aria-hidden>✏️</span> Edit post
           </MenuItem>
-          <MenuItem onClick={() => copyLink()}>
+          <MenuItem onClick={copyLink}>
             <span aria-hidden>📋</span> Copy link
           </MenuItem>
-          {canManage && (
-            <MenuItem onClick={doDelete} danger>
-              <span aria-hidden>🗑️</span> Delete post
-            </MenuItem>
-          )}
+          <MenuItem onClick={doDelete} danger>
+            <span aria-hidden>🗑️</span> Delete post
+          </MenuItem>
         </div>
       )}
 
@@ -110,12 +90,10 @@ export default function PostActions({ entry }: { entry: Entry }) {
           onClose={() => setEditing(false)}
           onSaved={() => {
             setEditing(false)
-            setToast('Post updated')
+            onNotify('Post updated')
           }}
         />
       )}
-
-      <Toast message={toast} onDone={() => setToast(null)} />
     </div>
   )
 }
