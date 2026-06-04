@@ -1,7 +1,9 @@
-import { useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import GoogleLogo from '@/components/GoogleLogo'
 import GoogleWordmark from '@/components/GoogleWordmark'
 import { useAuth } from '@/lib/auth'
+import { ApiError } from '@/lib/api'
 
 // Friendly text for the ?error= codes the Google OAuth callback can redirect with.
 const OAUTH_ERRORS: Record<string, string> = {
@@ -14,16 +16,42 @@ const OAUTH_ERRORS: Record<string, string> = {
 }
 
 /**
- * Login page. Sign-in is Google SSO only (restricted to @google.com).
+ * Login page.
+ *  - "Continue with Google" → real OAuth (restricted to @google.com)
+ *  - Dev shortcut → POST /api/auth/dev-signin (only works while the backend
+ *    has ALLOW_DEV_SIGNIN=true)
  */
 export default function LoginPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { startGoogleOAuth } = useAuth()
+  const { signIn, startGoogleOAuth } = useAuth()
+  const [busy, setBusy] = useState(false)
 
   const errCode = searchParams.get('error')
-  const error = errCode ? OAUTH_ERRORS[errCode] ?? 'Sign-in failed. Please try again.' : null
+  const [error, setError] = useState<string | null>(
+    errCode ? OAUTH_ERRORS[errCode] ?? 'Sign-in failed. Please try again.' : null,
+  )
   // A brand-new teammate who just signed in but is awaiting admin approval.
   const isPending = searchParams.get('pending') === '1'
+
+  const handleDevSignIn = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await signIn('u-abhishek')
+      navigate('/feed')
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        setError('Dev sign-in is disabled on the server.')
+      } else if (e instanceof ApiError && e.status === 404) {
+        setError('Admin account not found.')
+      } else {
+        setError('Sign-in failed. Is the backend reachable?')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="min-h-full flex items-center justify-center px-4 py-8">
@@ -51,7 +79,8 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={startGoogleOAuth}
-          className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-sm border border-line-strong bg-surface hover:bg-surface-soft transition text-md font-medium"
+          disabled={busy}
+          className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-sm border border-line-strong bg-surface hover:bg-surface-soft transition text-md font-medium disabled:opacity-60"
         >
           <GoogleWordmark />
           <span className="text-ink">Continue with Google</span>
@@ -62,6 +91,19 @@ export default function LoginPage() {
         </p>
 
         {error && <p className="text-xs text-rose-600 mt-3">{error}</p>}
+
+        {/* Dev shortcut — only works while the backend allows dev sign-in */}
+        <div className="border-t border-line mt-5 pt-3 space-y-1.5">
+          <p className="text-[10px] text-ink-3 uppercase tracking-wider">Dev shortcuts</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleDevSignIn}
+            className="block w-full text-[11px] text-ink-2 hover:text-g-blue disabled:opacity-60"
+          >
+            Log in as Abhishek (Admin)
+          </button>
+        </div>
       </div>
     </div>
   )
