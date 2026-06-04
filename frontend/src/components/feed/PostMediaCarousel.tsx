@@ -11,20 +11,84 @@ interface Props {
 }
 
 /**
+ * One media item inside a uniform, fixed-aspect frame.
+ *
+ * Photos/videos in a post can have very different shapes (wide group photos,
+ * tall action clips). To keep the carousel a consistent height with NO ugly
+ * black letterbox bars, every slide uses the same square box and:
+ *   - a blurred, zoomed copy of the image fills the background, then
+ *   - the real image/video sits on top with object-contain (nothing cropped).
+ */
+function MediaFrame({
+  photo,
+  title,
+  index,
+  count,
+  onOpen,
+}: {
+  photo: Photo
+  title: string
+  index: number
+  count: number
+  onOpen?: () => void
+}) {
+  const blurSrc = photo.thumbUrl ?? photo.url
+  const blurLayer = (
+    <img
+      aria-hidden
+      src={blurSrc}
+      alt=""
+      className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50"
+    />
+  )
+
+  if (photo.kind === 'video') {
+    return (
+      <div className="relative w-full aspect-square bg-ink overflow-hidden">
+        {blurLayer}
+        <video
+          src={photo.url}
+          poster={photo.thumbUrl}
+          controls
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 w-full h-full object-contain"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative block w-full aspect-square bg-ink overflow-hidden group/frame"
+      aria-label={count > 1 ? `Open photo ${index + 1} of ${count}` : undefined}
+    >
+      {blurLayer}
+      <img
+        src={photo.url}
+        alt={photo.label ?? `${title}${count > 1 ? ` — ${index + 1}` : ''}`}
+        className="absolute inset-0 w-full h-full object-contain group-hover/frame:scale-[1.01] transition"
+      />
+    </button>
+  )
+}
+
+/**
  * Instagram-style inline media carousel for a post card.
  *
  * - Native horizontal swipe (CSS scroll-snap) on touch
  * - Prev/next arrows on hover (desktop)
  * - Dot indicators + "n/m" counter so it's obvious there's more than one
- * - Photos click through to the lightbox; videos play inline with controls
- * - A single photo/video renders with no carousel chrome
+ * - Every slide is the same height (uniform square), so mixed-aspect photos
+ *   no longer letterbox with black bars
  */
 export default function PostMediaCarousel({ photos, title, onOpenLightbox }: Props) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(0)
   const count = photos.length
 
-  // Update the active index as the user scrolls/swipes.
   const handleScroll = useCallback(() => {
     const el = trackRef.current
     if (!el) return
@@ -32,47 +96,26 @@ export default function PostMediaCarousel({ photos, title, onOpenLightbox }: Pro
     setActive((prev) => (prev === idx ? prev : idx))
   }, [])
 
-  const scrollToIdx = useCallback((idx: number) => {
-    const el = trackRef.current
-    if (!el) return
-    const clamped = Math.max(0, Math.min(count - 1, idx))
-    el.scrollTo({ left: clamped * el.clientWidth, behavior: 'smooth' })
-  }, [count])
+  const scrollToIdx = useCallback(
+    (idx: number) => {
+      const el = trackRef.current
+      if (!el) return
+      const clamped = Math.max(0, Math.min(count - 1, idx))
+      el.scrollTo({ left: clamped * el.clientWidth, behavior: 'smooth' })
+    },
+    [count],
+  )
 
   if (count === 0) return null
 
-  // Single item — render plainly, no carousel chrome.
+  // Single item — no carousel chrome.
   if (count === 1) {
-    const p = photos[0]
-    return p.kind === 'video' ? (
-      <div className="relative bg-black">
-        <video
-          src={p.url}
-          poster={p.thumbUrl}
-          controls
-          playsInline
-          preload="metadata"
-          className="w-full max-h-[440px] bg-black"
-        />
-      </div>
-    ) : (
-      <button
-        type="button"
-        onClick={() => onOpenLightbox(0)}
-        className="block w-full relative group"
-      >
-        <img
-          src={p.url}
-          alt={p.label ?? title}
-          className="w-full max-h-[440px] object-cover group-hover:scale-[1.01] transition"
-        />
-      </button>
-    )
+    return <MediaFrame photo={photos[0]} title={title} index={0} count={1} onOpen={() => onOpenLightbox(0)} />
   }
 
   // Multiple items — full carousel.
   return (
-    <div className="relative group/carousel bg-black">
+    <div className="relative group/carousel">
       {/* Scroll track */}
       <div
         ref={trackRef}
@@ -81,30 +124,8 @@ export default function PostMediaCarousel({ photos, title, onOpenLightbox }: Pro
         style={{ scrollbarWidth: 'none' }}
       >
         {photos.map((p, i) => (
-          <div key={p.id} className="w-full flex-shrink-0 snap-center bg-black">
-            {p.kind === 'video' ? (
-              <video
-                src={p.url}
-                poster={p.thumbUrl}
-                controls
-                playsInline
-                preload="metadata"
-                className="w-full max-h-[440px] bg-black"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => onOpenLightbox(i)}
-                className="block w-full"
-                aria-label={`Open photo ${i + 1} of ${count}`}
-              >
-                <img
-                  src={p.url}
-                  alt={p.label ?? `${title} — ${i + 1}`}
-                  className="w-full max-h-[440px] object-cover"
-                />
-              </button>
-            )}
+          <div key={p.id} className="w-full flex-shrink-0 snap-center">
+            <MediaFrame photo={p} title={title} index={i} count={count} onOpen={() => onOpenLightbox(i)} />
           </div>
         ))}
       </div>
