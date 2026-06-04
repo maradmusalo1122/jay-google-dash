@@ -6,6 +6,7 @@ import MentionInput from './MentionInput'
 import { ALL_TAGS, type Entry, type Tag } from '@/types'
 import { deserializeMentions } from '@/lib/mentions'
 import { copyPostLink } from '@/lib/share'
+import { uploadMedia, type UploadedMedia } from '@/lib/uploads'
 import { cn } from '@/lib/cn'
 
 /**
@@ -122,7 +123,20 @@ function MenuItem({
   )
 }
 
-/* ── Edit modal (title / caption / tag) ─────────────────────────── */
+/* ── Edit modal (title / caption / tag / media) ─────────────────── */
+
+const MAX_MEDIA = 10
+
+interface EditMedia {
+  key: string
+  kind: 'photo' | 'video'
+  preview: string // existing thumb/url, or an object URL while uploading
+  existingId?: string // set when this is an already-saved photo to keep
+  uploaded?: UploadedMedia // set when this is a freshly uploaded item
+  status: 'ready' | 'uploading' | 'error'
+  pct: number
+}
+
 function EditPostModal({
   entry,
   onClose,
@@ -136,18 +150,82 @@ function EditPostModal({
   const [title, setTitle] = useState(entry.title)
   const [caption, setCaption] = useState(() => deserializeMentions(entry.caption, users))
   const [tag, setTag] = useState<Tag>(entry.tag)
+  const [media, setMedia] = useState<EditMedia[]>(() =>
+    [...entry.photos]
+      .sort((a, b) => a.order - b.order)
+      .map((p) => ({
+        key: p.id,
+        kind: (p.kind ?? 'photo') as 'photo' | 'video',
+        preview: p.kind === 'video' ? p.url : p.thumbUrl ?? p.url,
+        existingId: p.id,
+        status: 'ready' as const,
+        pct: 100,
+      })),
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const uploading = media.some((m) => m.status === 'uploading')
+
+  const removeMedia = (key: string) => {
+    setMedia((prev) => {
+      const t = prev.find((m) => m.key === key)
+      if (t && !t.existingId && t.preview.startsWith('blob:')) URL.revokeObjectURL(t.preview)
+      return prev.filter((m) => m.key !== key)
+    })
+  }
+
+  const onPickFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return
+    const remaining = MAX_MEDIA - media.length
+    const arr = Array.from(files).slice(0, remaining)
+    const tiles: EditMedia[] = arr.map((f) => ({
+      key: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      kind: f.type.startsWith('video/') ? 'video' : 'photo',
+      preview: URL.createObjectURL(f),
+      status: 'uploading',
+      pct: 0,
+    }))
+    setMedia((prev) => [...prev, ...tiles])
+    await Promise.all(
+      tiles.map(async (tile, i) => {
+        try {
+          const up = await uploadMedia(arr[i], {
+            onProgress: (pct) => setMedia((prev) => prev.map((m) => (m.key === tile.key ? { ...m, pct } : m))),
+          })
+          setMedia((prev) => prev.map((m) => (m.key === tile.key ? { ...m, uploaded: up, status: 'ready', pct: 100 } : m)))
+        } catch {
+          setMedia((prev) => prev.map((m) => (m.key === tile.key ? { ...m, status: 'error' } : m)))
+        }
+      }),
+    )
+  }
 
   const save = async () => {
     if (!title.trim()) {
       setError('Title cannot be empty.')
       return
     }
+    if (uploading) return
     setBusy(true)
     setError(null)
+    const photos = media
+      .filter((m) => m.status === 'ready')
+      .map((m) =>
+        m.existingId
+          ? { id: m.existingId }
+          : {
+              kind: m.uploaded!.kind,
+              url: m.uploaded!.url,
+              thumbUrl: m.uploaded!.thumbUrl,
+              width: m.uploaded!.width,
+              height: m.uploaded!.height,
+              duration: m.uploaded!.duration,
+            },
+      )
     try {
-      await editEntry(entry.id, { title: title.trim(), caption: caption.trim(), tag })
+      await editEntry(entry.id, { title: title.trim(), caption: caption.trim(), tag, photos })
       onSaved()
     } catch {
       setBusy(false)
@@ -182,6 +260,69 @@ function EditPostModal({
           className="w-full text-md px-3 py-2 rounded-sm border border-line bg-surface outline-none focus:border-g-blue mb-3 h-24 resize-none"
         />
 
+        {/* Media editor */}
+        <label className="block text-xs font-medium text-ink-3 mb-1.5">
+          Photos &amp; videos {media.length > 0 && <span className="text-ink-3">({media.length})</span>}
+        </label>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            onPickFiles(e.target.files)
+            e.target.value = ''
+          }}
+        />
+        <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 mb-1.5">
+          {media.map((m) => (
+            <div key={m.key} className="relative aspect-square rounded-sm overflow-hidden bg-ink/5">
+              {m.kind === 'video' ? (
+                <video src={m.preview} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+              ) : (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <img src={m.preview} className="w-full h-full object-cover" />
+              )}
+              {m.kind === 'video' && (
+                <span className="absolute bottom-0.5 left-0.5 text-white text-[10px] drop-shadow">▶</span>
+              )}
+              {m.status === 'uploading' && (
+                <div className="absolute inset-0 bg-ink/60 flex items-center justify-center text-white text-[10px]">
+                  {m.pct}%
+                </div>
+              )}
+              {m.status === 'error' && (
+                <div className="absolute inset-0 bg-rose-700/80 flex items-center justify-center text-white text-[9px] px-1 text-center">
+                  failed
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => removeMedia(m.key)}
+                aria-label="Remove media"
+                className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-rose-600"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {media.length < MAX_MEDIA && (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="aspect-square rounded-sm border-2 border-dashed border-line text-ink-3 hover:border-g-blue hover:text-g-blue flex flex-col items-center justify-center text-lg"
+              aria-label="Add photos or videos"
+            >
+              +
+              <span className="text-[9px] leading-none">Add</span>
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-ink-3 mb-4">
+          Tap × to remove. Removed media is deleted from the post when you save. A post can have no media at all.
+        </p>
+
         <label className="block text-xs font-medium text-ink-3 mb-1.5">Tag</label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-4">
           {ALL_TAGS.map((t) => (
@@ -208,10 +349,10 @@ function EditPostModal({
           <button
             type="button"
             onClick={save}
-            disabled={busy || !title.trim()}
+            disabled={busy || uploading || !title.trim()}
             className="px-4 py-2 rounded-sm bg-g-blue text-white text-base font-medium hover:bg-g-blue-d disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {busy ? 'Saving…' : 'Save changes'}
+            {busy ? 'Saving…' : uploading ? 'Uploading…' : 'Save changes'}
           </button>
         </div>
       </div>

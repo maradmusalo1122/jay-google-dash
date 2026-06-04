@@ -136,21 +136,39 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
   res.status(201).json({ entry: reshape(out!) })
 })
 
+// A media item in an edit request. Either { id } to KEEP an existing photo, or
+// a new media object (url + kind…) to ADD. Anything not listed gets removed.
+const EditPhoto = z.object({
+  id: z.string().optional(),
+  kind: z.enum(['photo', 'video']).optional(),
+  url: z.string().max(2_000_000).optional(),
+  thumbUrl: z.string().max(2_000_000).optional(),
+  label: z.string().max(120).optional(),
+  duration: z.number().int().nonnegative().optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+})
+
 const UpdateEntryBody = z.object({
   title: z.string().min(1).max(200).optional(),
   caption: z.string().optional(),
   tag: DisplayTag.optional(),
+  // When present, this is the FULL desired set of media, in order. Existing
+  // photos are referenced by id; new ones carry a url. Omitted entirely = leave
+  // media untouched. Empty array = remove all media (text-only post).
+  photos: z.array(EditPhoto).max(20).optional(),
 })
 
 router.put('/:id', requireAuth, async (req: Request, res: Response) => {
   const me = req.currentUser!
-  const existing = await prisma.entry.findUnique({ where: { id: req.params.id } })
+  const id = req.params.id
+  const existing = await prisma.entry.findUnique({ where: { id } })
   if (!existing) return res.status(404).json({ error: 'not_found' })
   if (existing.authorId !== me.id && me.role !== 'admin') {
     return res.status(403).json({ error: 'forbidden' })
   }
   const parsed = UpdateEntryBody.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: 'bad_input' })
+  if (!parsed.success) return res.status(400).json({ error: 'bad_input', detail: parsed.error.flatten() })
 
   const data: { title?: string; caption?: string; tag?: ReturnType<typeof toPrismaTag> } = {}
   if (parsed.data.title !== undefined) data.title = parsed.data.title
@@ -161,12 +179,61 @@ router.put('/:id', requireAuth, async (req: Request, res: Response) => {
     data.tag = pt
   }
 
-  const entry = await prisma.entry.update({
-    where: { id: req.params.id },
+  // Apply scalar fields (also bumps updatedAt).
+  await prisma.entry.update({
+    where: { id },
     data: data as { title?: string; caption?: string; tag?: NonNullable<ReturnType<typeof toPrismaTag>> },
-    include: entryInclude,
   })
-  res.json({ entry: reshape(entry) })
+
+  // Reconcile media if a photos list was supplied.
+  if (parsed.data.photos !== undefined) {
+    const incoming = parsed.data.photos
+    // Detach the hero first so deleting the current hero photo can't trip the
+    // heroPhotoId foreign key.
+    await prisma.entry.update({ where: { id }, data: { heroPhotoId: null } })
+
+    const current = await prisma.photo.findMany({ where: { entryId: id }, select: { id: true } })
+    const currentIds = new Set(current.map((p) => p.id))
+    const keepIds = incoming.filter((i) => i.id && currentIds.has(i.id)).map((i) => i.id as string)
+
+    // Delete anything not kept.
+    if (keepIds.length === 0) {
+      await prisma.photo.deleteMany({ where: { entryId: id } })
+    } else {
+      await prisma.photo.deleteMany({ where: { entryId: id, id: { notIn: keepIds } } })
+    }
+
+    // Re-order kept photos and create new ones, following the incoming order.
+    let order = 0
+    for (const item of incoming) {
+      if (item.id && currentIds.has(item.id)) {
+        await prisma.photo.update({ where: { id: item.id }, data: { order } })
+        order++
+      } else if (item.url) {
+        await prisma.photo.create({
+          data: {
+            entryId: id,
+            kind: item.kind ?? 'photo',
+            url: item.url,
+            thumbUrl: item.thumbUrl,
+            label: item.label,
+            duration: item.duration,
+            width: item.width,
+            height: item.height,
+            order,
+          },
+        })
+        order++
+      }
+    }
+
+    // Point the hero at the new first photo (or null if the post is now text-only).
+    const first = await prisma.photo.findFirst({ where: { entryId: id }, orderBy: { order: 'asc' } })
+    await prisma.entry.update({ where: { id }, data: { heroPhotoId: first ? first.id : null } })
+  }
+
+  const out = await prisma.entry.findUnique({ where: { id }, include: entryInclude })
+  res.json({ entry: reshape(out!) })
 })
 
 router.delete('/:id', requireAuth, async (req: Request, res: Response) => {

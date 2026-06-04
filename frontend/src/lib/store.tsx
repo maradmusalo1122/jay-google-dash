@@ -82,7 +82,23 @@ interface StoreState {
     /** @deprecated use `hero` */
     photoSeed?: string
   }) => Promise<Entry>
-  editEntry: (id: string, patch: Partial<Pick<Entry, 'title' | 'caption' | 'tag'>>) => Promise<void>
+  editEntry: (
+    id: string,
+    patch: Partial<Pick<Entry, 'title' | 'caption' | 'tag'>> & {
+      /** Full desired media list, in order. Existing items keep their `id`; new
+       *  ones carry a `url`. Anything omitted is removed. Empty = remove all. */
+      photos?: Array<{
+        id?: string
+        kind?: 'photo' | 'video'
+        url?: string
+        thumbUrl?: string
+        label?: string
+        width?: number
+        height?: number
+        duration?: number
+      }>
+    },
+  ) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
   editComment: (commentId: string, body: string) => Promise<void>
   deleteComment: (commentId: string) => Promise<void>
